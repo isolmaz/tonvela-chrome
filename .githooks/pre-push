@@ -1,0 +1,3 @@
+#!/bin/sh
+# Runs checks before every push; see tools/pre-push.mjs.
+exec node tools/pre-push.mjs "$@"

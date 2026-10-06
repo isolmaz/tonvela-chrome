@@ -1,0 +1,49 @@
+TONVELA — CHROME VOLUME EXTENSION / 1.3.2
+
+INSTALL
+1. Extract the ZIP into a permanent folder.
+2. Type chrome://extensions in the Chrome address bar.
+3. Turn on Developer mode in the top right.
+4. Click Load unpacked.
+5. Select the folder that contains this file and manifest.json.
+6. Open a video. Pin Tonvela from the Chrome puzzle icon.
+7. Open Tonvela and turn on the switch in the top right.
+
+The ZIP can't be installed by dragging it into Chrome. Extract it first.
+Don't delete or move the folder after installing.
+No account or extra software is needed. Requires Chrome 116+.
+
+UPDATING
+Turn Tonvela off on open tabs first. Extract the new ZIP. You can replace the
+extension files in your existing folder with the new ones and press Reload
+on chrome://extensions. Reloading the same extension keeps your preferences.
+
+BASIC USE
+When off, a short start screen appears. Turn the switch on to get the
+controls: 0–400% volume, Keep volume steady and Keep this level.
+The interface is in English by default; choose Türkçe under Advanced
+settings → Language.
+
+"Keep this level": play a comfortable part for 1–2 seconds and press the
+button. The last measured level becomes the target; silence is ignored.
+If you don't like it, Undo in the notice restores the previous settings.
+
+Closing the window doesn't stop processing. Turning the switch off returns
+the tab to its normal audio and keeps your preferences. Each tab starts
+separately; processing ends when the tab closes.
+
+FULLY LOCAL
+All code and the speech model are inside the ZIP. No model downloads, APIs,
+servers, recording or microphone use. Preferences stay in the browser; no
+cloud sync.
+
+EXPERIMENTAL MODE
+Voice only tries to suppress background sound with the local GTCRN neural
+network. It doesn't promise perfect music/effects removal; output is mono.
+The model runs at 16 kHz outside the audio thread and adds about 50 ms of
+delay. If your computer can't keep up, the window shows a warning.
+
+MORE
+The Help button opens the bundled help page. Test notes and limits:
+https://github.com/isolmaz/tonvela-chrome (docs/TEST_RESULTS.txt).
+THIRD_PARTY_NOTICES.txt contains the open source notices.

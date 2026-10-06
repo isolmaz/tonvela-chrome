@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Tonvela</title><link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="wave" viewBox="0 0 24 24"><path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/></symbol>
+    <symbol id="sliders" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16M8 5v6m8 2v6"/></symbol>
+    <symbol id="voice" viewBox="0 0 24 24"><path d="M9 6a3 3 0 0 1 6 0v6a3 3 0 0 1-6 0zm-3 6a6 6 0 0 0 12 0M12 18v3m-3 0h6"/></symbol>
+    <symbol id="moon" viewBox="0 0 24 24"><path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10Z"/></symbol>
+    <symbol id="music" viewBox="0 0 24 24"><path d="M9 17V5l11-2v12M9 8l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2"/><ellipse cx="17" cy="16" rx="3" ry="2"/></symbol>
+    <symbol id="spark" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Zm8-1v4m-2-2h4"/></symbol>
+    <symbol id="icon-reset" viewBox="0 0 24 24"><path d="M4 5v6h6M4 11a8 8 0 1 1 2 7"/></symbol>
+    <symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></symbol>
+    <symbol id="chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  </svg>
+  <main>
+    <header>
+      <div class="brand"><div class="brand-mark"><svg><use href="#wave"/></svg></div><div><h1>Tonvela<span>.</span></h1><p data-i18n="tagline"></p></div></div>
+      <button id="power-button" class="power-button" type="button" role="switch" aria-checked="false" data-i18n-attr="aria-label:powerAria" aria-controls="controls" disabled><span id="power-label"></span><span class="switch-track" aria-hidden="true"></span></button>
+    </header>
+    <div class="session-strip"><span id="site" data-i18n="loadingTab"></span><span class="status"><i id="status-dot"></i><span id="status-text" role="status" data-i18n="statusPreparing"></span></span></div>
+    <div class="content">
+      <div id="error" class="notice error" role="alert" hidden></div>
+      <div id="feedback" class="notice feedback" role="status" hidden><span id="feedback-text"></span><button id="undo" class="undo-button" type="button" data-i18n="undo" hidden></button></div>
+      <section id="off-state" class="off-state" data-i18n-attr="aria-label:offAria">
+        <p class="off-title" data-i18n="offTitle"></p>
+        <p id="off-description"></p>
+      </section>
+      <div id="controls" hidden>
+        <section class="volume-section" aria-labelledby="volume-label">
+          <div class="section-heading"><label id="volume-label" for="volume" data-i18n="volumeLabel"></label><span id="current-mode" class="badge"></span></div>
+          <div class="volume-value"><output id="volume-value" for="volume">100</output><span>%</span></div>
+          <input id="volume" class="range" type="range" min="0" max="400" step="1" value="100" aria-describedby="volume-help">
+          <div class="range-labels" id="volume-help"><span>0</span><span>100</span><span>200</span><span>300</span><span>400</span></div>
+          <div class="quick-row"><button type="button" data-volume="100">%100</button><button type="button" data-volume="200">%200</button><button type="button" data-volume="400">%400</button><span data-i18n="upTo4x"></span></div>
+        </section>
+        <section class="level-section" data-i18n-attr="aria-label:levelingAria">
+          <div class="level-heading"><div><label for="leveling" data-i18n="levelingLabel"></label><p data-i18n="levelingHint"></p></div><label class="switch"><input id="leveling" type="checkbox" role="switch"><span class="switch-track" aria-hidden="true"></span></label></div>
+          <button id="learn" class="learn-button" type="button" data-i18n-attr="title:learnTitle" disabled><svg><use href="#lock"/></svg><span data-i18n="learnButton"></span></button>
+          <div class="meter-row"><div class="meter" role="meter" data-i18n-attr="aria-label:meterAria" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="meter-fill"></div></div><span id="meter-note" data-i18n="meterWaiting"></span></div>
+        </section>
+        <details id="advanced" class="advanced">
+          <summary><span data-i18n="advanced"></span><svg><use href="#chevron"/></svg></summary>
+          <div class="advanced-content">
+            <section class="mode-section" aria-labelledby="mode-label">
+              <div class="section-heading"><h2 id="mode-label" data-i18n="modeLabel"></h2><span id="mode-tag"></span></div>
+              <div class="modes" role="radiogroup" aria-labelledby="mode-label">
+                <label class="mode"><input type="radio" name="mode" value="normal" checked><span><svg><use href="#wave"/></svg><span data-i18n="modeNormal"></span></span></label>
+                <label class="mode"><input type="radio" name="mode" value="steady"><span><svg><use href="#sliders"/></svg><span data-i18n="modeSteady"></span></span></label>
+                <label class="mode"><input type="radio" name="mode" value="speech"><span><svg><use href="#voice"/></svg><span data-i18n="modeSpeech"></span></span></label>
+                <label class="mode"><input type="radio" name="mode" value="night"><span><svg><use href="#moon"/></svg><span data-i18n="modeNight"></span></span></label>
+                <label class="mode"><input type="radio" name="mode" value="music"><span><svg><use href="#music"/></svg><span data-i18n="modeMusic"></span></span></label>
+                <label class="mode"><input type="radio" name="mode" value="voice"><span><svg><use href="#spark"/></svg><span data-i18n="modeVoice"></span></span></label>
+              </div>
+              <p id="mode-description" class="hint"></p>
+            </section>
+            <section id="target-panel" class="target-section" data-i18n-attr="aria-label:targetLabel">
+              <div class="target-label"><label for="target" data-i18n="targetLabel"></label><output id="target-value" for="target">62 / 100</output></div>
+              <input id="target" class="range small-range" type="range" min="-48" max="-6" step="1" value="-22" aria-describedby="target-hint">
+              <div class="target-captions"><span data-i18n="targetCalmer"></span><span data-i18n="targetLouder"></span></div>
+              <p id="target-hint" class="hint" data-i18n="targetHint"></p>
+            </section>
+            <section class="preferences" data-i18n-attr="aria-label:preferencesAria">
+              <label class="remember-row"><input id="remember" type="checkbox" checked><span data-i18n="rememberSite"></span></label>
+              <div class="theme-row"><label for="theme" data-i18n="themeLabel"></label><select id="theme"><option value="dark" data-i18n="themeDark"></option><option value="light" data-i18n="themeLight"></option><option value="system" data-i18n="themeSystem"></option></select></div>
+              <div class="theme-row"><label for="language" data-i18n="languageLabel"></label><select id="language"><option value="en">English</option><option value="tr">Türkçe</option></select></div>
+              <button id="shortcuts" type="button" class="settings-button"><span data-i18n="shortcuts"></span> <span>↗</span></button>
+              <button id="reset" type="button" class="settings-button"><span data-i18n="resetAudio"></span><svg><use href="#icon-reset"/></svg></button>
+            </section>
+          </div>
+        </details>
+      </div>
+    </div>
+    <footer><span class="local-label"><i></i><span data-i18n="localLabel"></span></span><button id="help" class="text-button" type="button" data-i18n="help"></button></footer>
+  </main>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

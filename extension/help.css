@@ -1,0 +1,15 @@
+body { margin: 0; line-height: 1.7; }
+main { max-width: 760px; margin: 64px auto; padding: 0 26px; }
+.eyebrow { font-size: 12px; letter-spacing: 3px; color: var(--accent); font-weight: 600; }
+h1 { font-size: 42px; letter-spacing: -1.7px; line-height: 1.15; margin: 17px 0; }
+.lead { font-size: 17px; color: var(--muted); }
+section { margin-top: 32px; border-top: 1px solid var(--border); padding-top: 20px; }
+h2 { font-size: 21px; letter-spacing: -.5px; }
+p, dd, li { font-size: 14px; }
+dt { font-size: 14px; font-weight: 650; margin-top: 17px; color: var(--accent); }
+dd { margin-left: 0; margin-top: 3px; }
+li { margin-bottom: 7px; }
+kbd { background: var(--surface); border: 1px solid var(--border); padding: 2px 5px; border-radius: 4px; font-size: 12px; }
+footer { font-size: 12px; color: var(--muted); margin-top: 40px; }
+a { color: var(--accent); }
+@media (max-width: 600px) { main { margin-top: 30px; } h1 { font-size: 32px; } }

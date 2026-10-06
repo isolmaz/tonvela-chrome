@@ -1,0 +1,12 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const sharp = require("sharp");
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect x="3" y="3" width="122" height="122" rx="35" fill="#087f78"/><g fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"><path d="M32 56v16M48 39v50M64 27v74M80 39v50M96 56v16"/></g></svg>`;
+for (const size of [16,32,48,128]) await sharp(Buffer.from(svg)).resize(size,size).png().toFile(path.resolve(`extension/icons/${size}.png`));
+const runtime = await fs.readFile("extension/vendor/gtcrn.js", "utf8");
+const wrapperLicense = await fs.readFile("extension/vendor/LICENSE-gtcrn-wasm.txt", "utf8");
+const notices = runtime.slice(0, runtime.indexOf("//#region"));
+await fs.writeFile("extension/THIRD_PARTY_NOTICES.txt", `TONVELA — THIRD PARTY NOTICES\n\n@sapphi-red/gtcrn-wasm 0.0.3\nSource: https://github.com/sapphi-red/gtcrn-wasm\nPackage: https://www.npmjs.com/package/@sapphi-red/gtcrn-wasm\nBundled files: vendor/gtcrn.js, vendor/gtcrn.wasm\nThe runtime and model are included locally, without runtime downloads.\n\n${wrapperLicense}\n\nModel source: https://github.com/Xiaobin-Rong/gtcrn\nFFT source: https://github.com/marton78/pffft\n\n${notices}\n`);
+console.log("Icons and third-party notices created.");
