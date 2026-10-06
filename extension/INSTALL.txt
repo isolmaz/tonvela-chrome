@@ -44,6 +44,6 @@ The model runs at 16 kHz outside the audio thread and adds about 50 ms of
 delay. If your computer can't keep up, the window shows a warning.
 
 MORE
-The Help button opens the bundled help page. Test notes and limits:
-https://github.com/isolmaz/tonvela-chrome (docs/TEST_RESULTS.txt).
+The Help button opens the bundled help page, including known limits.
+Source and releases: https://github.com/isolmaz/tonvela-chrome
 THIRD_PARTY_NOTICES.txt contains the open source notices.

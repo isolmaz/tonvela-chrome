@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- INSTALL.txt points to the GitHub repository for source and releases.
+
 ## 1.3.2 — October 6, 2026
 
 - Quick volume buttons follow the interface language (`100%` in English, `%100` in Turkish).
