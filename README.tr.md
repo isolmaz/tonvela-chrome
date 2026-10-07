@@ -41,6 +41,10 @@ Sekme sesini yükselten, dengeleyen ve netleştiren Chrome eklentisi — tamamen
 
 ## Kurulum
 
+**Chrome Web Store:** [Tonvela — Volume Control](https://chromewebstore.google.com/detail/hionjhaedpahfidncfeainedjcdkfecn). Mağazadan kurulan eklenti kendiliğinden güncellenir.
+
+**Elle:**
+
 1. [`Tonvela-Chrome.zip`](https://github.com/isolmaz/tonvela-chrome/releases/latest/download/Tonvela-Chrome.zip) dosyasını indirip bir klasöre çıkar.
 2. `chrome://extensions` sayfasını aç ve **Geliştirici modu**nu aç.
 3. **Paketlenmemiş öğe yükle**'ye tıkla ve çıkardığın klasörü seç.
@@ -52,9 +56,11 @@ Ses tarayıcında işlenir ve dışarı çıkmaz. Sunucu, hesap, analiz, kayıt 
 
 ## Geliştirme
 
-Node.js 22+ ve Python 3 gerekir; eklentinin derleme adımı yoktur (`extension/` klasörünü **Paketlenmemiş öğe yükle** ile açın). CI (`.github/workflows/ci.yml`) her PR ve `main`'e her push'ta `npm run check` (lint + birim testleri) çalıştırır; aynı kontrolleri yerelde `npm run check` ile yapabilirsiniz. Tarayıcı ve ses modeli testleri CI'da çalışmaz (`npm run verify`). Komutlar ve testler için [İngilizce README](README.md#development) dosyasına bakın.
+Node.js 22+ ve Python 3 gerekir; eklentinin derleme adımı yoktur (`extension/` klasörünü **Paketlenmemiş öğe yükle** ile açın). CI (`.github/workflows/ci.yml`) her PR'da ve `release.yml` üzerinden `main`'e her push'ta `npm run check` (lint + birim testleri) çalıştırır; aynı kontrolleri yerelde `npm run check` ile yapabilirsiniz. Tarayıcı ve ses modeli testleri CI'da çalışmaz (`npm run verify`). Komutlar ve testler için [İngilizce README](README.md#development) dosyasına bakın.
 
 **Katkı:** `main`'e PR açın ve kullanıcıya dönük değişiklikleri [CHANGELOG.md](CHANGELOG.md) içindeki `## Unreleased` başlığı altına yazın. Sürüm numarasını değiştirmeyin; sürüm yayınlanırken belirlenir.
+
+**Yayın:** `main`'de yükseltilen sürüm, GitHub Actions'ta onaylanmadan Chrome Web Store'a gönderilmez. Ayrıntılar: [docs/RELEASING.md](docs/RELEASING.md) (İngilizce).
 
 ## Lisans
 

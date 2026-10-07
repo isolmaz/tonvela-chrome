@@ -1,9 +1,10 @@
 name: Release
 
 # Every push to main runs CI. When extension/manifest.json has a version without
-# a GitHub release, the extension ZIP is uploaded to the Chrome Web Store and
+# a GitHub release, the publish job waits for approval in the chrome-web-store
+# environment; once approved, the ZIP is uploaded to the Chrome Web Store and
 # submitted for review (it goes live once review passes), then released here as
-# v<version>. Needs the secrets CWS_SERVICE_ACCOUNT_KEY and CWS_PUBLISHER_ID.
+# v<version>. See docs/RELEASING.md.
 on:
   push:
     branches: [main]
@@ -11,10 +12,6 @@ on:
 
 permissions:
   contents: read
-
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
 
 jobs:
   check:
@@ -51,6 +48,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: chrome-web-store
+    # One submission at a time; a run waiting for approval doesn't hold up CI.
+    concurrency:
+      group: chrome-web-store
+      cancel-in-progress: false
     permissions:
       contents: write
     env:

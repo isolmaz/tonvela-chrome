@@ -7,7 +7,8 @@
 - A tab whose audio another extension already captures shows "Another extension is using this tab's audio" instead of the generic can't-capture message.
 - Closing a processed tab no longer leaves a stale error entry in session storage.
 - INSTALL.txt points to the GitHub repository for source and releases.
-- Every push to `main` runs CI; when the version is new, GitHub Actions uploads the ZIP to the Chrome Web Store, submits it for review and creates the GitHub release (`.github/workflows/release.yml`).
+- Every push to `main` runs CI. A new version is uploaded to the Chrome Web Store, submitted for review and released on GitHub only after approval in GitHub Actions (`docs/RELEASING.md`).
+- README links the Chrome Web Store listing.
 
 ## 1.3.2 — October 6, 2026
 
