@@ -41,6 +41,10 @@ A Chrome extension that boosts, levels and clarifies tab audio — entirely on y
 
 ## Install
 
+**Chrome Web Store:** [Tonvela — Volume Control](https://chromewebstore.google.com/detail/hionjhaedpahfidncfeainedjcdkfecn). Store installs update automatically.
+
+**Manually:**
+
 1. Download and extract [`Tonvela-Chrome.zip`](https://github.com/isolmaz/tonvela-chrome/releases/latest/download/Tonvela-Chrome.zip).
 2. Open `chrome://extensions` and turn on **Developer mode**.
 3. Click **Load unpacked** and select the extracted folder.
@@ -63,15 +67,17 @@ npm run package        # build dist/Tonvela-Chrome-v<version>.zip
 
 Browser tests play audible audio and need `npx playwright install chromium` plus a speech fixture from `tools/create-speech-fixture.ps1` (Windows). Before each push, the hook runs lint and unit tests, and the browser tests when `extension/` changed and they are set up.
 
-CI (`.github/workflows/ci.yml`, Ubuntu, Node 22) runs `npm ci --ignore-scripts` and `npm run check` (lint + unit tests) on every pull request and every push to `main`. Run the same checks locally with `npm run check`. CI does not run the browser or speech model tests (`npm run verify` runs them locally) or the packager, so run `npm run verify` yourself when you change `extension/`.
+CI (`.github/workflows/ci.yml`, Ubuntu, Node 22) runs `npm ci --ignore-scripts` and `npm run check` (lint + unit tests) on every pull request and, through `release.yml`, on every push to `main`. Run the same checks locally with `npm run check`. CI does not run the browser or speech model tests (`npm run verify` runs them locally) or the packager, so run `npm run verify` yourself when you change `extension/`.
 
 **Contributing:** open a pull request against `main` and describe user-facing changes under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md). Don't change version numbers; they are set when a release is published.
+
+**Releases:** a version bump on `main` is sent to the Chrome Web Store only after it is approved in GitHub Actions. See [docs/RELEASING.md](docs/RELEASING.md).
 
 ```
 extension/   the extension itself (what ships)
 tests/       unit tests
 tools/       pre-push checks, browser and speech model tests, packager, README media
-docs/media/  README GIFs
+docs/        release process (RELEASING.md), README GIFs (media/)
 ```
 
 ## License

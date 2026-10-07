@@ -59,7 +59,7 @@ function render() {
   $("target").setAttribute("aria-valuetext", t("targetValueText", $("target-value").textContent));
   updateFill($("target"));
   $("remember").checked = settings.remember;
-  $("power-button").disabled = busy || !supported;
+  $("power-button").disabled = busy || (!supported && !active);
   $("power-button").setAttribute("aria-checked", String(active));
   $("power-label").textContent = t(busy ? "powerWait" : active ? "powerOn" : "powerOff");
   $("learn").disabled = busy || !active;
