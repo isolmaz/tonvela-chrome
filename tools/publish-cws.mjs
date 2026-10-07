@@ -29,7 +29,9 @@ async function call(method, url, body, type) {
 // OAuth 2.0 JWT bearer grant with the service account key:
 // https://developers.google.com/identity/protocols/oauth2/service-account#httprest
 async function accessToken() {
-  const account = JSON.parse(key);
+  let account;
+  // JSON.parse error messages quote part of the input; never let them echo the key into the log.
+  try { account = JSON.parse(key); } catch { throw new Error("CWS_SERVICE_ACCOUNT_KEY is not valid JSON"); }
   const now = Math.floor(Date.now() / 1000);
   const part = value => Buffer.from(JSON.stringify(value)).toString("base64url");
   const unsigned = `${part({ alg: "RS256", typ: "JWT" })}.${part({ iss: account.client_email, scope: "https://www.googleapis.com/auth/chromewebstore", aud: account.token_uri, iat: now, exp: now + 3600 })}`;
