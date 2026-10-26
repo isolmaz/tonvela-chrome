@@ -1,8 +1,8 @@
 /* global chrome -- used inside extension callbacks */
 // Records the README GIFs (docs/media) and Chrome Web Store images (dist/store, or
 // the folder in TONVELA_STORE_DIR) from the real extension popup in Chromium.
-// Screenshots are made for every interface language; the promo tiles carry no
-// words because the store can't localize them. Needs .cache/test-speech.wav
+// Screenshots are made for every interface language; the store has one pair of
+// promo tiles for all languages, in English. Needs .cache/test-speech.wav
 // (tools/create-speech-fixture.ps1) and plays it audibly while recording.
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -114,11 +114,12 @@ try {
     const start = Date.now();
     while (!await ui(expression)) { if (Date.now() - start > timeout) throw new Error(`timed out: ${expression}`); await delay(80); }
   };
-  const click = selector => ui(`document.querySelector(${JSON.stringify(selector)}).click()`);
+  // Script clicks count as keyboard use for focus rings, so the focus is dropped.
+  const click = selector => ui(`document.querySelector(${JSON.stringify(selector)}).click(); document.activeElement?.blur()`);
   const select = (selector, value) => ui(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); e.value = ${JSON.stringify(value)}; e.dispatchEvent(new Event("change", {bubbles:true})); })()`);
   const key = name => ui(`document.querySelector("#volume").dispatchEvent(new KeyboardEvent("keydown", {key: ${JSON.stringify(name)}, bubbles: true}))`);
   const apply = settings => ui(`chrome.tabs.query({active:true,currentWindow:true}).then(([tab]) => chrome.runtime.sendMessage({target:"background",type:"apply",tabId:tab.id,settings:${JSON.stringify(settings)},final:true}))`);
-  const back = () => ui('document.querySelector(".view:not([hidden]) [data-back]")?.click()');
+  const back = () => ui('document.querySelector(".view:not([hidden]) [data-back]")?.click(); document.activeElement?.blur()');
   const setLanguage = async language => {
     await select("#language", language);
     await until(`document.documentElement.lang === ${JSON.stringify(language.replace("_", "-"))}`);
@@ -239,8 +240,8 @@ try {
   await frame(1000);
   await saveGif("settings.gif");
 
-  // Chrome Web Store: four 1280x800 screenshots per language (opaque PNGs),
-  // language-neutral 440x280 and 1400x560 promo tiles, and the store icon.
+  // Chrome Web Store: four 1280x800 screenshots per language, the 440x280 and
+  // 1400x560 promo tiles (opaque PNGs), and the store icon.
   await fs.rm(store, { recursive: true, force: true });
   await fs.mkdir(store, { recursive: true });
   await openPopupTab();
@@ -282,6 +283,46 @@ try {
     ]).removeAlpha().png().toFile(path.join(store, language, file));
   }
 
+  // Promo tiles: the volume bar at 400% and the listening features. The store
+  // shows one pair in every language, so they are in English.
+  const GLYPHS = {
+    speaker: '<path d="M4 9h3l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6m2.5-8.5a7.5 7.5 0 0 1 0 11"/>',
+    wave: '<path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/>',
+    voice: '<path d="M9 6a3 3 0 0 1 6 0v6a3 3 0 0 1-6 0zm-3 6a6 6 0 0 0 12 0M12 18v3m-3 0h6"/>',
+    mono: '<path d="M3 6l7 6-7 6M21 6l-7 6 7 6"/>',
+    balance: '<path d="M3 12h18"/><circle cx="12" cy="12" r="3.5"/>',
+    shield: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/>',
+    headphones: '<path d="M4 16v-4a8 8 0 0 1 16 0v4M4 15h3v5H4zM17 15h3v5h-3z"/>'
+  };
+  const glyph = (name, x, y, size) => `<g transform="translate(${x} ${y}) scale(${size / 24})" fill="none" stroke="${ACCENT}" stroke-width="${2 * 24 / size + 0.6}" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[name]}</g>`;
+  const label = (x, y, size, text, extra = "") => `<text x="${x}" y="${y}" font-size="${size}" fill="#1d1d1f" ${extra}>${escape(text)}</text>`;
+  async function promoTiles(popupPng) {
+    const speaker = `<g transform="translate(50 126) scale(${32 / 24})" fill="none" stroke="#ffffff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${GLYPHS.speaker}</g>`;
+    let x = 28;
+    const chips = [["mono", "Mono"], ["balance", "Balance"], ["shield", "Hearing protection"]].map(([name, text]) => {
+      const chip = glyph(name, x, 213, 22) + label(x + 30, 230, 16, text);
+      x += 30 + text.length * 8.6 + 18;
+      return chip;
+    }).join("");
+    const small = `<svg xmlns="http://www.w3.org/2000/svg" width="440" height="280"><rect width="440" height="280" fill="${STAGE.light}"/><g font-family="Segoe UI, sans-serif">${label(94, 56, 30, "Tonvela", 'font-weight="600"')}${label(94, 82, 18, "Volume Booster", 'fill-opacity=".62"')}<rect x="28" y="110" width="384" height="64" rx="19" fill="${ACCENT}"/>${speaker}<text x="386" y="153" font-size="30" font-weight="700" fill="#ffffff" text-anchor="end">400%</text>${chips}</g></svg>`;
+    await sharp(Buffer.from(small)).composite([{ input: await sharp(icon).resize(52).png().toBuffer(), left: 28, top: 28 }]).removeAlpha().png().toFile(path.join(store, "promo-tile-440x280.png"));
+
+    const { height: captured } = await sharp(popupPng).metadata();
+    const { image, width, height } = await roundedPopup(popupPng, Math.min(1.2, 440 / (captured / 2)));
+    const features = [["wave", "Steady"], ["voice", "Speech"], ["mono", "Mono sound"], ["balance", "Left / right balance"], ["shield", "Hearing protection"], ["headphones", "Output device"]];
+    const grid = features.map(([name, text], i) => {
+      const fx = 96 + (i % 2) * 340;
+      const fy = 296 + Math.floor(i / 2) * 64;
+      return glyph(name, fx, fy, 30) + label(fx + 44, fy + 23, 23, text);
+    }).join("");
+    const marquee = `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560"><rect width="1400" height="560" fill="${STAGE.light}"/><g font-family="Segoe UI, sans-serif">${label(180, 124, 40, "Tonvela", 'font-weight="600"')}${label(96, 222, 54, CAPTIONS.en[0][0], 'font-weight="700"')}${grid}</g></svg>`;
+    await sharp(Buffer.from(marquee)).composite([
+      { input: await sharp(icon).resize(68).png().toBuffer(), left: 96, top: 76 },
+      { input: await shadow(width, height, 18), left: 1400 - 96 - width - 60, top: Math.round((560 - height) / 2) - 60 },
+      { input: image, left: 1400 - 96 - width, top: Math.round((560 - height) / 2) }
+    ]).removeAlpha().png().toFile(path.join(store, "marquee-1400x560.png"));
+  }
+
   for (const language of Object.keys(CAPTIONS)) {
     await fs.mkdir(path.join(store, language), { recursive: true });
     await setLanguage(language);
@@ -289,7 +330,9 @@ try {
     const captions = CAPTIONS[language];
     await apply({ volume: 300, mode: "normal" });
     await until('document.querySelector("#volume").getAttribute("aria-valuenow") === "300"');
-    await storeImage("screenshot-1-volume.png", await sharpShot(), captions[0], { language });
+    const volumeShot = await sharpShot();
+    await storeImage("screenshot-1-volume.png", volumeShot, captions[0], { language });
+    if (language === "en") await promoTiles(volumeShot);
     await apply({ volume: 150, mode: "steady" });
     await until('document.querySelector("#volume").getAttribute("aria-valuenow") === "150"');
     await click("#open-modes");
@@ -311,12 +354,6 @@ try {
   await setLanguage("en");
   await setTheme("light");
 
-  // Promo tiles show the brand and a volume bar, without words to translate.
-  const bar = (x, y, w, h, fill) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h * 0.3}" fill="#ffffff"/><rect x="${x}" y="${y}" width="${Math.round(w * fill)}" height="${h}" rx="${h * 0.3}" fill="${ACCENT}"/>`;
-  const tile = `<svg xmlns="http://www.w3.org/2000/svg" width="440" height="280"><rect width="440" height="280" fill="${STAGE.light}"/><g font-family="Segoe UI, sans-serif"><text x="148" y="112" font-size="40" font-weight="600" fill="#1d1d1f">Tonvela</text></g>${bar(68, 160, 304, 44, 0.62)}</svg>`;
-  await sharp(Buffer.from(tile)).composite([{ input: await sharp(icon).resize(64).png().toBuffer(), left: 68, top: 66 }]).removeAlpha().png().toFile(path.join(store, "promo-tile-440x280.png"));
-  const marquee = `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560"><rect width="1400" height="560" fill="${STAGE.light}"/><g font-family="Segoe UI, sans-serif"><text x="236" y="236" font-size="72" font-weight="600" fill="#1d1d1f">Tonvela</text><text x="1288" y="300" font-size="150" font-weight="600" fill="#1d1d1f" text-anchor="end">400<tspan font-size="70" fill="#6e6e73">%</tspan></text></g>${bar(112, 330, 1176, 96, 1)}</svg>`;
-  await sharp(Buffer.from(marquee)).composite([{ input: await sharp(icon).resize(100).png().toBuffer(), left: 112, top: 162 }]).removeAlpha().png().toFile(path.join(store, "marquee-1400x560.png"));
   await sharp(icon).resize(96).extend({ top: 16, bottom: 16, left: 16, right: 16, background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toFile(path.join(store, "store-icon-128.png"));
   await click("#original");
   console.log("store images written");

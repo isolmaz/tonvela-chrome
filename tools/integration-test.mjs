@@ -17,7 +17,10 @@ const server = http.createServer(async (req, res) => {
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const url = `http://127.0.0.1:${server.address().port}/`;
 const extension = path.resolve("extension");
-const context = await chromium.launchPersistentContext(path.resolve(".cache/fulltest-profile"), { headless: true, executablePath: chromium.executablePath(), ignoreDefaultArgs: ["--disable-extensions", "--mute-audio"], args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, "--enable-unsafe-extension-debugging", "--window-size=1280,1000", "--lang=en-US"], viewport: { width: 1000, height: 800 }, screen: { width: 1280, height: 1000 } });
+// A fresh profile each run: a kept one can start the extension's previous service worker code.
+const profile = path.resolve(".cache/fulltest-profile");
+await fs.rm(profile, { recursive: true, force: true });
+const context = await chromium.launchPersistentContext(profile, { headless: true, executablePath: chromium.executablePath(), ignoreDefaultArgs: ["--disable-extensions", "--mute-audio"], args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, "--enable-unsafe-extension-debugging", "--window-size=1280,1000", "--lang=en-US"], viewport: { width: 1000, height: 800 }, screen: { width: 1280, height: 1000 } });
 let sequence = 0;
 const calls = new Map();
 const runtimeErrors = [];
