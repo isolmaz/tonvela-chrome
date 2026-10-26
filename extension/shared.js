@@ -121,8 +121,9 @@ export function readableError(error) {
   const text = String(error?.message || error || "errUnknown");
   if (isMessageKey(text)) return t(text);
   if (/activeTab|invoked|not been invoked|Extension has not/.test(text)) return t("errActiveTab");
+  // Chrome words a second capture of the same tab as "Cannot capture a tab with an active stream."
+  if (/already being captured|already captured|active stream/.test(text)) return t("errAlreadyCaptured");
   if (/Cannot capture|chrome:\/\/|not supported|not capturable/.test(text)) return t("errCannotCapture");
-  if (/already being captured|already captured/.test(text)) return t("errAlreadyCaptured");
   if (/No tab with id/.test(text)) return t("errNoTab");
   if (/Receiving end does not exist|Could not establish connection/.test(text)) return t("errEngineConnection");
   if (/Permission|NotAllowed|denied|not permitted/.test(text)) return t("errPermission");

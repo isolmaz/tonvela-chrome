@@ -98,6 +98,8 @@ test("pending writes let the caller choose where the delayed flush runs", async 
 test("errors map to readable text; unknown keys and messages pass through", () => {
   assert.equal(readableError(new Error("errNoTab")), "errNoTab", "Node has no chrome.i18n, so keys come back unchanged");
   assert.equal(readableError(new Error("Tab is already being captured")), "errAlreadyCaptured");
+  assert.equal(readableError(new Error("Cannot capture a tab with an active stream.")), "errAlreadyCaptured", "Chrome's wording for a tab that is already captured");
+  assert.equal(readableError(new Error("Cannot capture this page")), "errCannotCapture");
   assert.equal(readableError(new Error("NotAllowedError: denied")), "errPermission");
   assert.equal(readableError(new Error("No tab with id: 12.")), "errNoTab");
   assert.equal(readableError(new Error("Could not establish connection. Receiving end does not exist.")), "errEngineConnection");

@@ -87,7 +87,8 @@ async function apply(tab, settings, final) {
 async function handle(message) {
   if (message.type === "session-ended") {
     await badge(message.tabId, null).catch(() => {});
-    if (message.error) await chrome.storage.session.set({ [`error:${message.tabId}`]: message.error });
+    // Closing the tab ends its stream too; onRemoved has already cleaned up and must stay the last word.
+    if (message.error && await chrome.tabs.get(message.tabId).then(() => true, () => false)) await chrome.storage.session.set({ [`error:${message.tabId}`]: message.error });
     await closeIfEmpty(message.tabId);
     return {};
   }
@@ -162,6 +163,17 @@ chrome.tabs.onRemoved.addListener(tabId => {
   serialize(async () => {
     if (await exists()) { await audio("stop", tabId); await closeIfEmpty(tabId); }
     await chrome.storage.session.remove(`error:${tabId}`);
+  }).catch(() => {});
+});
+
+// Chrome clears a tab's badge and title when it navigates, while the capture keeps running.
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (!changeInfo.status && !changeInfo.url) return;
+  serialize(async () => {
+    const state = await getSession(tabId);
+    if (!state) return;
+    await loadLocale().catch(() => {});
+    await badge(tabId, state.settings);
   }).catch(() => {});
 });
 

@@ -11,7 +11,7 @@ Sekme sesini yükselten, dengeleyen ve netleştiren Chrome eklentisi — tamamen
 
 [English](README.md) · **Türkçe**
 
-![Manifest V3](https://img.shields.io/badge/Manifest-V3-087f78) ![Chrome 116+](https://img.shields.io/badge/Chrome-116%2B-087f78) ![Yerel](https://img.shields.io/badge/ses-cihazda%20kal%C4%B1r-087f78)
+[![CI](https://github.com/isolmaz/tonvela-chrome/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/isolmaz/tonvela-chrome/actions/workflows/ci.yml) ![Manifest V3](https://img.shields.io/badge/Manifest-V3-087f78) ![Chrome 116+](https://img.shields.io/badge/Chrome-116%2B-087f78) ![Yerel](https://img.shields.io/badge/ses-cihazda%20kal%C4%B1r-087f78)
 
 </div>
 
@@ -44,6 +44,10 @@ Sekme sesini yükselten, dengeleyen ve netleştiren Chrome eklentisi — tamamen
 
 ## Kurulum
 
+**Chrome Web Store:** [Tonvela - Ses Yükseltici](https://chromewebstore.google.com/detail/hionjhaedpahfidncfeainedjcdkfecn). Mağazadan kurulan eklenti kendiliğinden güncellenir.
+
+**Elle:**
+
 1. [`Tonvela-Chrome.zip`](https://github.com/isolmaz/tonvela-chrome/releases/latest/download/Tonvela-Chrome.zip) dosyasını indirip bir klasöre çıkar.
 2. `chrome://extensions` sayfasını aç ve **Geliştirici modu**nu aç.
 3. **Paketlenmemiş öğe yükle**'ye tıkla ve çıkardığın klasörü seç.
@@ -55,9 +59,11 @@ Ses tarayıcında işlenir ve dışarı çıkmaz. Sunucu, hesap, analiz veya kay
 
 ## Geliştirme
 
-Node.js 22+ ve Python 3 gerekir; eklentinin derleme adımı yoktur (`extension/` klasörünü **Paketlenmemiş öğe yükle** ile açın). Komutlar ve testler için [İngilizce README](README.md#development) dosyasına bakın.
+Node.js 22+ ve Python 3 gerekir; eklentinin derleme adımı yoktur (`extension/` klasörünü **Paketlenmemiş öğe yükle** ile açın). CI (`.github/workflows/ci.yml`) her PR'da ve `release.yml` üzerinden `main`'e her push'ta `npm run check` (lint + birim testleri) çalıştırır; aynı kontrolleri yerelde `npm run check` ile yapabilirsiniz. Tarayıcı ve ses modeli testleri CI'da çalışmaz (`npm run verify`). Komutlar ve testler için [İngilizce README](README.md#development) dosyasına bakın.
 
 **Katkı:** `main`'e PR açın ve kullanıcıya dönük değişiklikleri [CHANGELOG.md](CHANGELOG.md) içindeki `## Unreleased` başlığı altına yazın. Sürüm numarasını değiştirmeyin; sürüm yayınlanırken belirlenir.
+
+**Yayın:** `main`'de yükseltilen sürüm, GitHub Actions'ta onaylanmadan Chrome Web Store'a gönderilmez. Ayrıntılar: [docs/RELEASING.md](docs/RELEASING.md) (İngilizce).
 
 ## Lisans
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.0 — October 27, 2026
 
 - New, simpler popup: a large volume number, a volume bar, 100% / 200% / 400% buttons, a Listening mode list and **Back to original sound**. Settings move to their own screen.
 - No on/off switch: changing the sound starts Tonvela on the tab, and Back to original sound releases it.
@@ -11,7 +11,16 @@
 - Spanish, Brazilian Portuguese and Arabic (right to left), with help pages. Until a language is chosen, Tonvela follows Chrome's language. The theme follows the system by default.
 - Store names: "Tonvela - Volume Booster" and localized names per language.
 - Fixes: the Voice only worker could fall behind and add delay; the badge, saved state and active state could disagree after a failed start; the badge used the wrong language; a quick language change could show the earlier language; errors were stored in the language of the moment; raw Chrome errors could reach the popup.
+
+## 1.3.3 — October 7, 2026
+
+- The volume badge and tooltip stay on a tab after it navigates or reloads; Chrome cleared them while the audio kept being processed.
+- Tonvela can be turned off on a tab that navigated to a page it can't capture (such as a new-tab or settings page); the switch used to stay greyed out.
+- A tab whose audio another extension already captures shows "Another extension is using this tab's audio" instead of the generic can't-capture message.
+- Closing a processed tab no longer leaves a stale error entry in session storage.
 - INSTALL.txt points to the GitHub repository for source and releases.
+- Every push to `main` runs CI. A new version is uploaded to the Chrome Web Store, submitted for review and released on GitHub only after approval in GitHub Actions (`docs/RELEASING.md`).
+- README links the Chrome Web Store listing.
 
 ## 1.3.2 — October 6, 2026
 
