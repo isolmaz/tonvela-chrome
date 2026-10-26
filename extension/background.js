@@ -109,7 +109,20 @@ async function handle(message) {
   if (message.type === "listener") {
     const listener = normalizeListener(message.listener);
     await chrome.storage.local.set({ listener });
-    if (await exists()) await audio("listener", tab.id, { listener });
+    if (await exists()) {
+      try { await audio("listener", tab.id, { listener }); }
+      catch (error) {
+        // A device that can't play stays unselected, so the tab isn't captured for it.
+        if (error.message === "errOutputDevice") {
+          const fallback = { ...listener, outputDevice: "" };
+          await chrome.storage.local.set({ listener: fallback });
+          await audio("listener", tab.id, { listener: fallback });
+          const current = await getSession(tab.id);
+          if (current) await apply(tab, current.settings, true);
+        }
+        throw error;
+      }
+    }
     const current = await getSession(tab.id);
     return { state: await apply(tab, current?.settings || normalizeSettings(message.settings), true), listener };
   }

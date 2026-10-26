@@ -4,6 +4,7 @@ import { rememberSite, applyCommand, createSerialQueue, createPendingWrites, nor
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const settings = (extra = {}) => normalizeSettings({ volume: 150, ...extra });
+const stored = ({ volume, mode, targetDb }) => ({ volume, mode, targetDb });
 
 test("site settings keep the most recently edited sites without extra fields", () => {
   let sites = {};
@@ -12,9 +13,9 @@ test("site settings keep the most recently edited sites without extra fields", (
   assert.equal(sites["site0.example"], undefined);
   sites = rememberSite(sites, "site10.example", { ...settings({ volume: 300 }), remember: false, extra: 1 });
   assert.equal(Object.keys(sites).at(-1), "site10.example");
-  assert.deepEqual(sites["site10.example"], settings({ volume: 300 }));
+  assert.deepEqual(sites["site10.example"], stored(settings({ volume: 300 })));
   assert.deepEqual(rememberSite(sites, "", settings()), sites);
-  assert.deepEqual(rememberSite(undefined, "a.example", settings()), { "a.example": settings() });
+  assert.deepEqual(rememberSite(undefined, "a.example", settings()), { "a.example": stored(settings()) });
 });
 
 test("keyboard commands step volume within bounds and switch between Normal and Steady", () => {

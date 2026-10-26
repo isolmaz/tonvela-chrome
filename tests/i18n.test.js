@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { MODES } from "../extension/shared.js";
+import { MODES, PROTECTION } from "../extension/shared.js";
 
 const root = path.resolve("extension");
 const locales = fs.readdirSync(path.join(root, "_locales"));
@@ -17,11 +17,14 @@ function usedKeys() {
     for (const [, key] of text.matchAll(/data-i18n="(\w+)"/g)) keys.add(key);
     for (const [, pairs] of text.matchAll(/data-i18n-attr="([^"]+)"/g)) for (const pair of pairs.split(/\s+/)) keys.add(pair.split(":")[1]);
     for (const [, key] of text.matchAll(/__MSG_(\w+)__/g)) keys.add(key);
-    for (const [, args] of text.matchAll(/\b(?:t|Error|fail)\(([^;]*?)\)/g)) {
+    for (const [, args] of text.matchAll(/\b(?:t|Error|fail|String)\(([^;]*?)\)/g)) {
       for (const [, key] of args.matchAll(/"([a-z]+[A-Z]\w*)"/g)) keys.add(key);
     }
+    // statusKey() returns keys that render later.
+    for (const [, value] of text.matchAll(/\breturn ([^;\n]*)/g)) for (const [, key] of value.matchAll(/"([a-z]+[A-Z]\w*)"/g)) keys.add(key);
   }
   for (const mode of Object.values(MODES)) keys.add(mode.name).add(mode.description);
+  for (const level of Object.keys(PROTECTION)) keys.add(`protection_${level}`);
   return keys;
 }
 
@@ -37,6 +40,11 @@ test("every message key used by the extension exists", () => {
     const missing = [...keys].filter(key => !messages[locale][key]);
     assert.deepEqual(missing, [], `${locale} is missing keys`);
   }
+});
+
+test("every message is used by the extension", () => {
+  const keys = usedKeys();
+  assert.deepEqual(Object.keys(messages.en).filter(key => !keys.has(key)), []);
 });
 
 test("placeholders are declared and the help page exists for each locale", () => {

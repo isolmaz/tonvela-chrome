@@ -70,7 +70,8 @@ export function rememberSite(sites, key, settings) {
   const next = { ...(sites || {}) };
   if (!key) return next;
   delete next[key];
-  next[key] = normalizeSettings(settings);
+  const { volume, mode, targetDb } = normalizeSettings(settings);
+  next[key] = { volume, mode, targetDb };
   return Object.fromEntries(Object.entries(next).slice(-MAX_SITES));
 }
 

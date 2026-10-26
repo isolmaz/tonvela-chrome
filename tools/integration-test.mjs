@@ -172,6 +172,7 @@ try {
   const deviceError = await request("listener", { listener: { outputDevice: "missing-device" }, settings: boosted.settings });
   assert.equal(deviceError.ok, false);
   assert.ok((await state())?.active, "a missing output device keeps the session on the default device");
+  assert.equal((await request("state")).listener.outputDevice, "", "a device that failed is not kept as the choice");
   await request("listener", { listener: {}, settings: boosted.settings });
   pass("A missing output device falls back to the default device");
 

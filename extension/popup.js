@@ -11,6 +11,7 @@ let rememberSites = true;
 let active = false;
 let supported = false;
 let starting = false;
+let pending = 0;
 let revision = 0;
 let sendTimer;
 let commitTimer;
@@ -19,6 +20,7 @@ let feedbackTimer;
 let undoAction = null;
 let meterPort = null;
 let lastState = null;
+let opener = null;
 
 async function request(type, extra = {}) {
   const response = await chrome.runtime.sendMessage({ target: "background", type, tabId, ...extra });
@@ -38,9 +40,13 @@ function feedback(text, undo = null) {
 // "yerel-dosya" is the stored site key for file: pages; show it in the chosen language.
 function siteLabel(site) { return site === "yerel-dosya" ? t("localFile") : site || t("openInVideoTab"); }
 function updateFill(input) { input.style.setProperty("--fill", `${100 * (Number(input.value) - Number(input.min)) / (Number(input.max) - Number(input.min))}%`); }
+// Keyboard focus moves into the new view, and back to the row that opened it.
 function show(view) {
+  if (view !== "main-view") opener = document.activeElement;
   for (const section of document.querySelectorAll(".view")) section.hidden = section.id !== view;
   document.querySelector("main").scrollTop = 0;
+  if (view === "main-view") opener?.focus();
+  else $(view).querySelector("[data-back]").focus();
 }
 
 function buildControls() {
@@ -74,7 +80,7 @@ function localizeControls() {
     label.querySelector(".mode-text > small").textContent = t(info.description);
   }
   for (const label of $("protection").children) label.querySelector("span").textContent = t(`protection_${label.querySelector("input").value}`);
-  $("site").textContent = siteLabel($("site").dataset.site);
+  if ("site" in $("site").dataset) $("site").textContent = siteLabel($("site").dataset.site);
 }
 
 function statusKey(meter) {
@@ -129,7 +135,7 @@ function render() {
   $("output-device").value = [...$("output-device").options].some(option => option.value === listener.outputDevice) ? listener.outputDevice : "";
   renderStatus();
 }
-const settled = () => !starting && !sendTimer && !commitTimer;
+const settled = () => !starting && !pending && !sendTimer && !commitTimer;
 
 // Live status: the engine pushes snapshots while this popup is open.
 function connectMeter() {
@@ -201,6 +207,7 @@ async function send(final) {
   const value = { ...settings };
   const capturing = !active && !isOriginal(value, listener);
   if (capturing) { starting = true; render(); }
+  pending++;
   try {
     const response = await request("apply", { settings: value, final });
     if (current === revision) {
@@ -210,6 +217,7 @@ async function send(final) {
   } catch (cause) {
     error(cause.message);
   } finally {
+    pending--;
     if (capturing) { starting = false; render(); }
   }
 }
@@ -232,17 +240,28 @@ function stepVolume(volume) {
 
 async function saveListener(next) {
   listener = normalizeListener(next);
-  revision++;
+  const current = ++revision;
   error();
   render();
   const capturing = !active && !isOriginal(settings, listener);
   if (capturing) { starting = true; render(); }
+  pending++;
+  let failed = false;
   try {
     const response = await request("listener", { listener, settings });
-    listener = normalizeListener(response.listener);
-    showState(response);
-  } catch (cause) { error(cause.message); }
-  finally { if (capturing) { starting = false; render(); } }
+    if (current === revision) {
+      listener = normalizeListener(response.listener);
+      showState(response);
+    }
+  } catch (cause) {
+    error(cause.message);
+    failed = true;
+  } finally {
+    pending--;
+    if (capturing) { starting = false; render(); }
+  }
+  // The background may have kept a different choice, such as the default device.
+  if (failed) await refresh();
 }
 
 const rightToLeft = () => document.documentElement.dir === "rtl";
@@ -260,12 +279,18 @@ $("volume").addEventListener("pointerdown", event => {
   change({ ...settings, volume: volumeFromPointer(event) }, false);
 });
 $("volume").addEventListener("pointermove", event => { if (dragging) change({ ...settings, volume: volumeFromPointer(event) }, false); });
-$("volume").addEventListener("pointerup", () => {
+function endDrag() {
   if (!dragging) return;
   dragging = false;
   $("volume").classList.remove("dragging");
   change(settings, true);
-});
+}
+$("volume").addEventListener("pointerup", endDrag);
+$("volume").addEventListener("pointercancel", endDrag);
+$("volume").addEventListener("lostpointercapture", endDrag);
+// Closing the popup mid-change still ends the interaction, so a return to the
+// original sound releases the capture.
+addEventListener("pagehide", () => { if (dragging || sendTimer || commitTimer) send(true); });
 $("volume").addEventListener("wheel", event => {
   if (!supported) return;
   event.preventDefault();
@@ -293,12 +318,14 @@ $("target").addEventListener("change", () => change(settings, true));
 $("learn").addEventListener("click", async () => {
   const previous = { ...settings };
   revision++;
+  pending++;
   try {
     const response = await request("learn");
     settings = normalizeSettings(response.state.settings);
     showState(response);
     feedback(t("learnedFeedback"), () => change(previous, true).then(() => feedback(t("undoneFeedback"))));
   } catch (cause) { error(cause.message); }
+  finally { pending--; }
 });
 $("undo").addEventListener("click", () => {
   const undo = undoAction;
@@ -312,11 +339,13 @@ $("original").addEventListener("click", async () => {
   revision++;
   error();
   hideFeedback();
+  pending++;
   try {
     const response = await request("reset");
     settings = normalizeSettings(response.settings);
     showState(response);
   } catch (cause) { error(cause.message); }
+  finally { pending--; }
 });
 
 $("open-modes").addEventListener("click", () => show("modes-view"));
@@ -325,6 +354,7 @@ for (const button of document.querySelectorAll("[data-back]")) button.addEventLi
 $("mono").addEventListener("change", () => saveListener({ ...listener, mono: $("mono").checked }));
 $("balance").addEventListener("input", () => {
   listener = { ...listener, balance: Number($("balance").value) };
+  revision++;
   render();
   clearTimeout(balanceTimer);
   balanceTimer = setTimeout(() => saveListener(listener), 150);
@@ -346,7 +376,7 @@ $("language").addEventListener("change", async () => {
   try { await saveLanguage($("language").value); }
   catch { $("language").value = currentLanguage(); return; }
   localizeControls();
-  render();
+  listDevices();
 });
 $("help").addEventListener("click", () => chrome.tabs.create({ url: chrome.runtime.getURL(t("helpPage")) }));
 $("shortcuts").addEventListener("click", () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" }));
@@ -377,4 +407,7 @@ try {
   await refresh();
   // Opening Tonvela applies a site's remembered sound, or the listener preferences.
   if (supported && !active && !isOriginal(settings, listener)) await send(true);
-} catch (cause) { error(cause.message); }
+} catch (cause) {
+  $("site").textContent = siteLabel("");
+  error(cause.message);
+}
