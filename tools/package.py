@@ -17,7 +17,8 @@ manifest = json.loads((extension / "manifest.json").read_text(encoding="utf-8"))
 assert manifest["manifest_version"] == 3
 version = manifest["version"]
 assert json.loads((root / "package.json").read_text(encoding="utf-8"))["version"] == version, "package.json and manifest versions differ"
-assert re.search(rf"^## {re.escape(version)} ", (root / "CHANGELOG.md").read_text(encoding="utf-8"), re.M), f"CHANGELOG.md has no {version} section"
+# A hand-set version is released from "## Unreleased" when its pull request is merged.
+assert re.search(rf"^## ({re.escape(version)} |Unreleased)", (root / "CHANGELOG.md").read_text(encoding="utf-8"), re.M), f"CHANGELOG.md has no {version} or Unreleased section"
 assert set(manifest["permissions"]) == {"activeTab", "tabCapture", "offscreen", "storage"}
 assert "host_permissions" not in manifest
 assert "connect-src 'self'" in manifest["content_security_policy"]["extension_pages"]
@@ -55,33 +56,42 @@ def write_report():
     today = date.today()
     gain_test = next(item for item in integration["results"] if "400 percent" in item["test"])
     level_test = next(item for item in integration["results"] if "Stable output" in item["test"])
-    simple_test = next(item for item in integration["results"] if "Enabled screen shows" in item["test"])
-    layout_test = next(item for item in integration["results"] if "Advanced popup scrolls" in item["test"])
+    protection_test = next(item for item in integration["results"] if "Hearing protection" in item["test"])
+    layout_test = next(item for item in integration["results"] if "fit within Chrome's popup size" in item["test"])
     report = f"""TONVELA {manifest['version']} — VERIFICATION NOTES
 Date: {today.strftime('%B')} {today.day}, {today.year}
 Environment: Windows, Chromium {integration['browser']}, separate test profile.
 
 COMPLETED CHECKS
-- Unit tests passed: 4x gain, peak limiting, stereo balance, target level
+- Unit tests passed: 4x gain, peak limiting, linked stereo, target level
   under changing input, 400% total cap, silence, 0% mute, invalid input,
-  settings validation, site preference cap, shortcuts, operation ordering,
-  write coalescing, the speech model frame queue and locale files.
-- Real Chrome tabCapture flow ran through the extension button and switch.
+  mono, left/right balance, hearing protection ceilings, settings and
+  listener validation, original-sound detection, site preference cap,
+  shortcuts, operation ordering, write coalescing, the speech model frame
+  queue and stale-frame skipping, language matching and locale files.
+- Real Chrome tabCapture flow ran through the extension button: opening
+  Tonvela does not capture; choosing a volume does; Back to original sound
+  releases the capture and the audio engine.
 - Measured digital gain at 400%: {gain_test['gainDb']:.2f} dB (about 4x).
+- Strict hearing protection at 400%: peaks at {protection_test['peakDb']:.2f} dBFS (ceiling -12 dBFS).
+- A missing output device falls back to the default device.
 - With input amplitude changed 4x in the browser, settled output levels were
   {level_test['quietDb']:.2f} dBFS and {level_test['loudDb']:.2f} dBFS (target -30 dBFS).
 - Keep this level: targets the heard level, refuses silence, undo restores.
 - Normal, Steady, Speech, Night, Music and Voice only modes.
+- Mono on its own captures the tab and releases it when turned off.
+- A remembered site gets its saved volume when Tonvela is opened there;
+  turning off site memory deletes the saved sites.
 - The speech model loaded and ran with the browser offline, in a Worker off
   the audio thread, without late frames.
-- Audio continues with the window closed; the switch releases capture; the
-  audio engine closes with the last tab; site settings are kept.
-- Interface: 372 px wide; simple screen {simple_test['height']} px, advanced
-  screen {layout_test['bodyHeight']} px. Advanced content scrolls inside; the switch
-  and site link stay visible. The meter updates without polling.
-- English is the default language; switching to Turkish and back works.
-- Dark/light/system appearance, live system theme tracking and the help page
-  following the theme passed.
+- Audio continues with the window closed; the audio engine closes with the
+  last tab.
+- Interface: 372 px wide; mode list {layout_test['modes']['bodyHeight']} px, settings
+  {layout_test['settings']['bodyHeight']} px (scrolls inside). Status updates without polling.
+- English, Turkish, Spanish, Portuguese (Brazil) and right-to-left Arabic
+  interfaces load with no empty labels and fit the popup width.
+- System appearance by default, live system theme tracking, light and dark,
+  and the help page following the theme passed.
 - No external network requests or runtime errors in the monitored extension
   contexts. The package policy limits connections to the extension's files.
 
@@ -101,6 +111,10 @@ NOT VERIFIED / LIMITS
   Protected content, every device and every Chrome version (including 116)
   were not tested. Two tabs sharing the audio engine at once was not tested
   in the browser.
+- Choosing a real second output device and the device-name permission page
+  were not tested; the test browser has only a default output.
+- Translations other than English and Turkish were not reviewed by native
+  speakers.
 - Shortcuts are registered with Chrome; OS-level conflicts were not tested.
 - Long-running stability, latency on all hardware and subjective quality
   were not measured.

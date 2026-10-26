@@ -1,6 +1,8 @@
-import { AudioSession } from "./audio-engine.js";
+import { AudioSession, setOutputDevice } from "./audio-engine.js";
+import { DEFAULT_LISTENER, normalizeListener } from "./shared.js";
 const sessions = new Map();
 const METER_INTERVAL = 150;
+let listener = DEFAULT_LISTENER;
 
 async function stop(tabId, reason) {
   const session = sessions.get(tabId);
@@ -10,16 +12,33 @@ async function stop(tabId, reason) {
   if (reason) chrome.runtime.sendMessage({ target: "background", type: "session-ended", tabId, error: reason }).catch(() => {});
 }
 
+// A missing device falls back to the default output instead of failing the session.
+async function applyOutputDevice(strict) {
+  try { await setOutputDevice(listener.outputDevice); }
+  catch {
+    await setOutputDevice("").catch(() => {});
+    if (strict) throw new Error("errOutputDevice");
+  }
+}
+
 async function handle(message) {
   const { type, tabId } = message;
   const current = sessions.get(tabId);
   if (type === "state") return { state: current?.snapshot() || null, count: sessions.size };
+  if (type === "listener") {
+    listener = normalizeListener(message.listener);
+    for (const session of sessions.values()) session.setListener(listener);
+    if (sessions.size) await applyOutputDevice(true);
+    return {};
+  }
   if (type === "prepare") {
     if (current) return { state: current.snapshot() };
-    const session = new AudioSession(tabId, message.settings, reason => stop(tabId, reason));
+    listener = normalizeListener(message.listener);
+    const session = new AudioSession(tabId, message.settings, listener, reason => stop(tabId, reason));
     sessions.set(tabId, session);
     try { await session.prepare(); }
     catch (error) { await stop(tabId); throw error; }
+    await applyOutputDevice(false);
     return { prepared: true };
   }
   if (type === "attach") {

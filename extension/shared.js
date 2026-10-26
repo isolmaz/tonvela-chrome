@@ -1,30 +1,55 @@
 import { t, isMessageKey } from "./i18n.js";
+import { PROTECTION } from "./audio/dynamics-core.js";
+
+export { PROTECTION };
 
 // name and description are message keys in _locales.
 export const MODES = Object.freeze({
-  normal: { name: "modeNormal", description: "modeNormalDesc", leveling: false, targetDb: -22 },
-  steady: { name: "modeSteady", description: "modeSteadyDesc", leveling: true, targetDb: -22 },
-  speech: { name: "modeSpeech", description: "modeSpeechDesc", leveling: true, targetDb: -22 },
-  night: { name: "modeNight", description: "modeNightDesc", leveling: true, targetDb: -28 },
-  music: { name: "modeMusic", description: "modeMusicDesc", leveling: false, targetDb: -22 },
-  voice: { name: "modeVoice", description: "modeVoiceDesc", leveling: true, targetDb: -22 }
+  normal: { name: "modeNormal", description: "modeNormalDesc", icon: "wave", leveling: false, targetDb: -22 },
+  steady: { name: "modeSteady", description: "modeSteadyDesc", icon: "sliders", leveling: true, targetDb: -22 },
+  speech: { name: "modeSpeech", description: "modeSpeechDesc", icon: "voice", leveling: true, targetDb: -22 },
+  night: { name: "modeNight", description: "modeNightDesc", icon: "moon", leveling: true, targetDb: -28 },
+  music: { name: "modeMusic", description: "modeMusicDesc", icon: "music", leveling: false, targetDb: -22 },
+  voice: { name: "modeVoice", description: "modeVoiceDesc", icon: "spark", leveling: true, targetDb: -22 }
 });
 
-export const DEFAULT_SETTINGS = Object.freeze({ volume: 100, mode: "normal", leveling: false, targetDb: -22, remember: true });
+// Per-site audio settings.
+export const DEFAULT_SETTINGS = Object.freeze({ volume: 100, mode: "normal", leveling: false, targetDb: -22 });
+// Listener preferences apply to every processed tab.
+export const DEFAULT_LISTENER = Object.freeze({ mono: false, balance: 0, protection: "off", outputDevice: "" });
+export const VOLUME_PRESETS = Object.freeze([100, 200, 400]);
 export const MAX_SITES = 100;
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const number = (value, fallback, min, max) => Number.isFinite(value) ? clamp(value, min, max) : fallback;
 
 export function normalizeSettings(value = {}) {
   if (!value || typeof value !== "object") value = {};
-  const mode = Object.hasOwn(MODES, value.mode) ? value.mode : "normal";
+  let mode = Object.hasOwn(MODES, value.mode) ? value.mode : "normal";
+  // Stored settings may carry a separate leveling flag next to Normal; that is Steady.
+  if (mode === "normal" && value.leveling === true) mode = "steady";
   return {
     volume: Math.round(number(value.volume, 100, 0, 400)),
     mode,
-    leveling: mode === "steady" || value.leveling === true,
-    targetDb: number(value.targetDb, -22, -48, -6),
-    remember: value.remember !== false
+    leveling: MODES[mode].leveling,
+    targetDb: number(value.targetDb, -22, -48, -6)
   };
+}
+
+export function normalizeListener(value = {}) {
+  if (!value || typeof value !== "object") value = {};
+  return {
+    mono: value.mono === true,
+    balance: Math.round(number(value.balance, 0, -100, 100)),
+    protection: Object.hasOwn(PROTECTION, value.protection) ? value.protection : "off",
+    outputDevice: typeof value.outputDevice === "string" && value.outputDevice.length <= 256 ? value.outputDevice : ""
+  };
+}
+
+// The tab plays its own audio, uncaptured, only when nothing would change it.
+export function isOriginal(settings, listener) {
+  const s = normalizeSettings(settings);
+  const l = normalizeListener(listener);
+  return s.volume === 100 && s.mode === "normal" && !l.mono && l.balance === 0 && l.protection === "off" && !l.outputDevice;
 }
 
 export function selectMode(settings, mode) {
@@ -35,16 +60,17 @@ export function selectMode(settings, mode) {
 export function siteKey(url) {
   try {
     const parsed = new URL(url);
+    // "yerel-dosya" is the stored key for file: pages and stays for existing preferences.
     return ["https:", "http:", "file:"].includes(parsed.protocol) ? (parsed.protocol === "file:" ? "yerel-dosya" : parsed.hostname) : "";
   } catch { return ""; }
 }
 
-// Keep only the most recently edited MAX_SITES site preferences, without history or page URLs.
+// Keep only the most recently edited MAX_SITES site settings, without history or page URLs.
 export function rememberSite(sites, key, settings) {
   const next = { ...(sites || {}) };
   if (!key) return next;
   delete next[key];
-  if (settings.remember) next[key] = settings;
+  next[key] = normalizeSettings(settings);
   return Object.fromEntries(Object.entries(next).slice(-MAX_SITES));
 }
 
@@ -52,10 +78,8 @@ export function applyCommand(settings, command) {
   const next = normalizeSettings(settings);
   if (command === "volume-up") next.volume = Math.min(400, next.volume + 10);
   else if (command === "volume-down") next.volume = Math.max(0, next.volume - 10);
-  else if (command === "toggle-leveling") {
-    next.leveling = !next.leveling;
-    if (!next.leveling && next.mode === "steady") next.mode = "normal";
-  } else return null;
+  else if (command === "toggle-leveling") return selectMode(next, next.leveling ? "normal" : "steady");
+  else return null;
   return next;
 }
 
@@ -98,6 +122,8 @@ export function readableError(error) {
   if (/activeTab|invoked|not been invoked|Extension has not/.test(text)) return t("errActiveTab");
   if (/Cannot capture|chrome:\/\/|not supported|not capturable/.test(text)) return t("errCannotCapture");
   if (/already being captured|already captured/.test(text)) return t("errAlreadyCaptured");
+  if (/No tab with id/.test(text)) return t("errNoTab");
+  if (/Receiving end does not exist|Could not establish connection/.test(text)) return t("errEngineConnection");
   if (/Permission|NotAllowed|denied|not permitted/.test(text)) return t("errPermission");
   if (/NotReadable|Could not start|Failed to start/.test(text)) return t("errNotReadable");
   return text.slice(0, 260);

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- New, simpler popup: a large volume number, a volume bar, 100% / 200% / 400% buttons, a Listening mode list and **Back to original sound**. Settings move to their own screen.
+- No on/off switch: changing the sound starts Tonvela on the tab, and Back to original sound releases it.
+- **Output device:** play the tabs Tonvela processes on a chosen speaker or headset. Device names appear after allowing microphone access once on a separate page; the microphone is closed right away.
+- **Mono sound** and **left / right balance**.
+- **Hearing protection:** a peak ceiling of Off, Light (−3 dB), Medium (−6 dB) or Strict (−12 dB) at any volume.
+- **Remember settings for each site** replaces per-site saving; turning it off deletes saved sites. Remembered sites store only volume, mode and target.
+- Spanish, Brazilian Portuguese and Arabic (right to left), with help pages. Until a language is chosen, Tonvela follows Chrome's language. The theme follows the system by default.
+- Store names: "Tonvela - Volume Booster" and localized names per language.
+- Fixes: the Voice only worker could fall behind and add delay; the badge, saved state and active state could disagree after a failed start; the badge used the wrong language; a quick language change could show the earlier language; errors were stored in the language of the moment; raw Chrome errors could reach the popup.
 - INSTALL.txt points to the GitHub repository for source and releases.
 
 ## 1.3.2 — October 6, 2026

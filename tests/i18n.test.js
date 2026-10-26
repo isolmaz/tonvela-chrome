@@ -55,3 +55,23 @@ test("messages substitute named placeholders", async () => {
   assert.equal(format(messages.tr.volumePercent, [80]), "%80");
   assert.equal(format(undefined), "");
 });
+
+test("browser languages map to a supported interface language", async () => {
+  const { matchLanguage, LANGUAGES } = await import("../extension/i18n.js");
+  assert.deepEqual(Object.keys(LANGUAGES).sort(), [...locales].sort(), "every interface language has a locale folder");
+  assert.equal(matchLanguage("es-419"), "es");
+  assert.equal(matchLanguage("pt-PT"), "pt_BR");
+  assert.equal(matchLanguage("pt_BR"), "pt_BR");
+  assert.equal(matchLanguage("ar-EG"), "ar");
+  assert.equal(matchLanguage("tr"), "tr");
+  assert.equal(matchLanguage("de-DE"), "en");
+  assert.equal(matchLanguage(undefined), "en");
+});
+
+test("short descriptions fit the store limit and names use a plain hyphen", () => {
+  for (const locale of locales) {
+    assert.ok(messages[locale].extDescription.message.length <= 132, locale);
+    assert.match(messages[locale].extName.message, /^Tonvela - \S/, locale);
+    assert.ok(!/—/.test(messages[locale].extName.message + messages[locale].extDescription.message), `${locale} has no em dash`);
+  }
+});

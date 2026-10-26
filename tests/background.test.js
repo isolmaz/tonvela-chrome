@@ -1,33 +1,59 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { rememberSite, applyCommand, createSerialQueue, createPendingWrites, normalizeSettings, readableError, MAX_SITES } from "../extension/shared.js";
+import { rememberSite, applyCommand, createSerialQueue, createPendingWrites, normalizeSettings, normalizeListener, isOriginal, readableError, MAX_SITES, DEFAULT_LISTENER } from "../extension/shared.js";
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const settings = (extra = {}) => normalizeSettings({ volume: 150, ...extra });
 
-test("site preferences keep the most recently edited sites and drop forgotten ones", () => {
+test("site settings keep the most recently edited sites without extra fields", () => {
   let sites = {};
   for (let i = 0; i < MAX_SITES + 5; i++) sites = rememberSite(sites, `site${i}.example`, settings({ volume: i }));
   assert.equal(Object.keys(sites).length, MAX_SITES);
   assert.equal(sites["site0.example"], undefined);
-  sites = rememberSite(sites, "site10.example", settings({ volume: 300 }));
+  sites = rememberSite(sites, "site10.example", { ...settings({ volume: 300 }), remember: false, extra: 1 });
   assert.equal(Object.keys(sites).at(-1), "site10.example");
-  assert.equal(sites["site10.example"].volume, 300);
-  sites = rememberSite(sites, "site10.example", settings({ remember: false }));
-  assert.equal(sites["site10.example"], undefined);
+  assert.deepEqual(sites["site10.example"], settings({ volume: 300 }));
   assert.deepEqual(rememberSite(sites, "", settings()), sites);
   assert.deepEqual(rememberSite(undefined, "a.example", settings()), { "a.example": settings() });
 });
 
-test("keyboard commands step volume within bounds and toggle leveling", () => {
+test("keyboard commands step volume within bounds and switch between Normal and Steady", () => {
   assert.equal(applyCommand(settings({ volume: 395 }), "volume-up").volume, 400);
   assert.equal(applyCommand(settings({ volume: 5 }), "volume-down").volume, 0);
   assert.equal(applyCommand(settings({ volume: 100 }), "volume-up").volume, 110);
   const steady = applyCommand(settings({ mode: "steady" }), "toggle-leveling");
-  assert.equal(steady.leveling, false);
   assert.equal(steady.mode, "normal");
-  assert.equal(applyCommand(settings({ mode: "music" }), "toggle-leveling").leveling, true);
+  assert.equal(steady.leveling, false);
+  const night = applyCommand(settings({ mode: "night" }), "toggle-leveling");
+  assert.equal(night.mode, "normal", "any leveling mode goes back to Normal");
+  const music = applyCommand(settings({ mode: "music", targetDb: -40 }), "toggle-leveling");
+  assert.equal(music.mode, "steady");
+  assert.equal(music.leveling, true);
+  assert.equal(music.targetDb, -22, "Steady starts from its own target");
   assert.equal(applyCommand(settings(), "unknown"), null);
+});
+
+test("leveling follows the mode, and a stored leveling flag on Normal means Steady", () => {
+  assert.equal(normalizeSettings({ mode: "normal", leveling: true }).mode, "steady");
+  assert.equal(normalizeSettings({ mode: "music", leveling: true }).leveling, false);
+  assert.equal(normalizeSettings({ mode: "speech", leveling: false }).leveling, true);
+});
+
+test("listener preferences reject invalid values", () => {
+  assert.deepEqual(normalizeListener(null), DEFAULT_LISTENER);
+  assert.deepEqual(normalizeListener({ mono: "yes", balance: 250, protection: "loud", outputDevice: 7 }), { mono: false, balance: 100, protection: "off", outputDevice: "" });
+  assert.equal(normalizeListener({ balance: -42.4 }).balance, -42);
+  assert.equal(normalizeListener({ protection: "strict" }).protection, "strict");
+  assert.equal(normalizeListener({ outputDevice: "x".repeat(300) }).outputDevice, "");
+});
+
+test("the tab keeps its own audio only when nothing would change it", () => {
+  assert.equal(isOriginal(settings({ volume: 100 }), DEFAULT_LISTENER), true);
+  assert.equal(isOriginal(settings({ volume: 105 }), DEFAULT_LISTENER), false);
+  assert.equal(isOriginal(settings({ volume: 100, mode: "speech" }), DEFAULT_LISTENER), false);
+  for (const change of [{ mono: true }, { balance: -5 }, { protection: "light" }, { outputDevice: "abc" }]) {
+    assert.equal(isOriginal(settings({ volume: 100 }), { ...DEFAULT_LISTENER, ...change }), false, JSON.stringify(change));
+  }
 });
 
 test("serial queue runs operations in order and survives failures", async () => {
@@ -72,6 +98,8 @@ test("errors map to readable text; unknown keys and messages pass through", () =
   assert.equal(readableError(new Error("errNoTab")), "errNoTab", "Node has no chrome.i18n, so keys come back unchanged");
   assert.equal(readableError(new Error("Tab is already being captured")), "errAlreadyCaptured");
   assert.equal(readableError(new Error("NotAllowedError: denied")), "errPermission");
+  assert.equal(readableError(new Error("No tab with id: 12.")), "errNoTab");
+  assert.equal(readableError(new Error("Could not establish connection. Receiving end does not exist.")), "errEngineConnection");
   assert.equal(readableError(null), "errUnknown");
   assert.equal(readableError(new Error("x".repeat(400))).length, 260);
 });

@@ -1,4 +1,8 @@
-// Linked stereo level control and a 5 ms look-ahead peak limiter.
+// Peak ceilings in dBFS for hearing protection; "off" stays just below full scale.
+export const PROTECTION = Object.freeze({ off: -0.5, light: -3, medium: -6, strict: -12 });
+const NIGHT_CEILING = -6;
+
+// Linked stereo level control, a 5 ms look-ahead peak limiter, then mono and balance.
 // No samples leave this processor. Total adaptive/manual gain is capped at 4.
 export class DynamicsCore {
   constructor(sampleRate, settings = {}) {
@@ -23,10 +27,15 @@ export class DynamicsCore {
 
   setSettings(settings) {
     const sane = (x, fallback, low, high) => Number.isFinite(x) ? Math.min(high, Math.max(low, x)) : fallback;
-    this.settings = { volume: sane(settings.volume, 100, 0, 400), leveling: settings.leveling === true || settings.mode === "steady", targetDb: sane(settings.targetDb, -22, -48, -6), mode: settings.mode || "normal" };
+    const protection = Object.hasOwn(PROTECTION, settings.protection) ? settings.protection : "off";
+    this.settings = { volume: sane(settings.volume, 100, 0, 400), leveling: settings.leveling === true || settings.mode === "steady", targetDb: sane(settings.targetDb, -22, -48, -6), mode: settings.mode || "normal", protection, mono: settings.mono === true, balance: sane(settings.balance, 0, -100, 100) };
     this.volume = this.settings.volume / 100;
     this.target = 10 ** (this.settings.targetDb / 20);
-    this.ceiling = 10 ** ((this.settings.mode === "night" ? -6 : -0.5) / 20);
+    const ceilingDb = Math.min(PROTECTION[protection], this.settings.mode === "night" ? NIGHT_CEILING : PROTECTION.off);
+    this.ceiling = 10 ** (ceilingDb / 20);
+    // Balance only attenuates the opposite side, so the ceiling still holds.
+    const balance = this.settings.balance / 100;
+    this.channelGains = [balance > 0 ? 1 - balance : 1, balance < 0 ? 1 + balance : 1];
     const upTime = this.settings.mode === "night" ? 0.28 : this.settings.mode === "music" ? 1.5 : 0.55;
     this.up = Math.exp(-1 / (this.sampleRate * upTime));
     this.down = Math.exp(-1 / (this.sampleRate * 0.035));
@@ -87,10 +96,13 @@ export class DynamicsCore {
       this.limiterGain = Math.min(limit, 1 - (1 - this.limiterGain) * this.release);
       maxReduction = Math.max(maxReduction, 1 - this.limiterGain);
       const readSlot = (slot + 1) % this.ringSize;
+      const ready = this.clock >= this.lookahead;
+      // Explicit mute also clears the look-ahead tail on the next quantum.
+      const gain = this.volume === 0 ? 0 : this.limiterGain;
+      const mono = this.settings.mono && channels === 2 && ready ? (this.rings[0][readSlot] + this.rings[1][readSlot]) / 2 : null;
       for (let ch = 0; ch < channels; ch++) {
-        const delayed = this.clock >= this.lookahead ? this.rings[ch][readSlot] : 0;
-        // Explicit mute also clears the look-ahead tail on the next quantum.
-        const value = this.volume === 0 ? 0 : delayed * this.limiterGain;
+        const delayed = mono ?? (ready ? this.rings[ch][readSlot] : 0);
+        const value = delayed * gain * (channels === 2 ? this.channelGains[ch] : 1);
         output[ch][n] = value;
         outputEnergy += value * value;
         outputPeak = Math.max(outputPeak, Math.abs(value));
