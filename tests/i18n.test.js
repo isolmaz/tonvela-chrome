@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { MODES } from "../extension/shared.js";
+import { MODES, PROTECTION } from "../extension/shared.js";
 
 const root = path.resolve("extension");
 const locales = fs.readdirSync(path.join(root, "_locales"));
@@ -17,11 +17,14 @@ function usedKeys() {
     for (const [, key] of text.matchAll(/data-i18n="(\w+)"/g)) keys.add(key);
     for (const [, pairs] of text.matchAll(/data-i18n-attr="([^"]+)"/g)) for (const pair of pairs.split(/\s+/)) keys.add(pair.split(":")[1]);
     for (const [, key] of text.matchAll(/__MSG_(\w+)__/g)) keys.add(key);
-    for (const [, args] of text.matchAll(/\b(?:t|Error|fail)\(([^;]*?)\)/g)) {
+    for (const [, args] of text.matchAll(/\b(?:t|Error|fail|String)\(([^;]*?)\)/g)) {
       for (const [, key] of args.matchAll(/"([a-z]+[A-Z]\w*)"/g)) keys.add(key);
     }
+    // statusKey() returns keys that render later.
+    for (const [, value] of text.matchAll(/\breturn ([^;\n]*)/g)) for (const [, key] of value.matchAll(/"([a-z]+[A-Z]\w*)"/g)) keys.add(key);
   }
   for (const mode of Object.values(MODES)) keys.add(mode.name).add(mode.description);
+  for (const level of Object.keys(PROTECTION)) keys.add(`protection_${level}`);
   return keys;
 }
 
@@ -39,6 +42,11 @@ test("every message key used by the extension exists", () => {
   }
 });
 
+test("every message is used by the extension", () => {
+  const keys = usedKeys();
+  assert.deepEqual(Object.keys(messages.en).filter(key => !keys.has(key)), []);
+});
+
 test("placeholders are declared and the help page exists for each locale", () => {
   for (const locale of locales) {
     for (const [key, entry] of Object.entries(messages[locale])) {
@@ -54,4 +62,24 @@ test("messages substitute named placeholders", async () => {
   assert.equal(format(entry, [150]), "Tonvela · 150%");
   assert.equal(format(messages.tr.volumePercent, [80]), "%80");
   assert.equal(format(undefined), "");
+});
+
+test("browser languages map to a supported interface language", async () => {
+  const { matchLanguage, LANGUAGES } = await import("../extension/i18n.js");
+  assert.deepEqual(Object.keys(LANGUAGES).sort(), [...locales].sort(), "every interface language has a locale folder");
+  assert.equal(matchLanguage("es-419"), "es");
+  assert.equal(matchLanguage("pt-PT"), "pt_BR");
+  assert.equal(matchLanguage("pt_BR"), "pt_BR");
+  assert.equal(matchLanguage("ar-EG"), "ar");
+  assert.equal(matchLanguage("tr"), "tr");
+  assert.equal(matchLanguage("de-DE"), "en");
+  assert.equal(matchLanguage(undefined), "en");
+});
+
+test("short descriptions fit the store limit and names use a plain hyphen", () => {
+  for (const locale of locales) {
+    assert.ok(messages[locale].extDescription.message.length <= 132, locale);
+    assert.match(messages[locale].extName.message, /^Tonvela - \S/, locale);
+    assert.ok(!/—/.test(messages[locale].extName.message + messages[locale].extDescription.message), `${locale} has no em dash`);
+  }
 });

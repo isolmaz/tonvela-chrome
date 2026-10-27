@@ -19,40 +19,43 @@ Sekme sesini yükselten, dengeleyen ve netleştiren Chrome eklentisi — tamamen
 
 <table>
 <tr>
-<td width="33%" align="center"><img src="docs/media/turn-on.gif" alt="Tonvela'yı açma: anahtar ses kontrollerini ve canlı ölçeri gösterir"></td>
-<td width="33%" align="center"><img src="docs/media/level.gif" alt="%400'e yükseltme, Sesi dengede tut ve geri alınabilen Bu ses seviyesini koru"></td>
-<td width="33%" align="center"><img src="docs/media/settings.gif" alt="Gelişmiş ayarlar: dinleme modları, açık tema ve Türkçe arayüz"></td>
+<td width="33%" align="center"><img src="docs/media/volume.gif" alt="Ses çubuğuyla sesi yükseltme, %400'ü seçme ve Orijinal sese dön"></td>
+<td width="33%" align="center"><img src="docs/media/modes.gif" alt="Dinleme modunu açıp Dengeli, Konuşma, Gece ve Müzik'i seçme"></td>
+<td width="33%" align="center"><img src="docs/media/settings.gif" alt="Ayarlar: mono ses, kulak koruma, koyu tema ve Türkçe arayüz"></td>
 </tr>
 <tr>
-<td align="center"><b>1. Aç</b><br>Video sekmesinde anahtarı aç. Ölçer duyduğun sesi gösterir.</td>
-<td align="center"><b>2. Yükselt ve dengele</b><br>%400'e kadar. <i>Sesi dengede tut</i> yüksek ve kısık bölümleri eşitler; <i>Bu ses seviyesini koru</i> şu an duyduğunu hedef yapar.</td>
-<td align="center"><b>3. İnce ayar</b><br>Altı dinleme modu, hedef seviye, site hafızası, tema ve dil.</td>
+<td align="center"><b>1. Sesi aç</b><br>Çubuğu sürükle ya da %100, %200 veya %400'ü seç. Ses değişince Tonvela başlar; <i>Orijinal sese dön</i> geri alır.</td>
+<td align="center"><b>2. Sesin karakterini seç</b><br>Dengeli yüksek ve kısık bölümleri eşitler, Konuşma sesleri öne çıkarır, Gece tepeleri yumuşatır.</td>
+<td align="center"><b>3. Kendine göre ayarla</b><br>Çıkış cihazı, mono, denge, kulak koruma, site hafızası, tema ve dil.</td>
 </tr>
 </table>
 
 ## Özellikler
 
 - **%400'e kadar ses**, ileriye bakan tepe sınırlayıcıyla.
-- **Sesi dengede tut:** kısık bölümler yükselir, yüksek bölümler azalır.
-- **Bu ses seviyesini koru:** duyduğun seviye hedef olur; geri alınabilir.
-- **Altı mod:** Normal, Sabit ses, Konuşma, Gece, Müzik ve deneysel **Sadece konuşma** (cihazda çalışan [GTCRN](https://github.com/Xiaobin-Rong/gtcrn) modeli, mono, ~50 ms gecikme).
+- **Dinleme modları:** Normal, Dengeli, Konuşma, Gece, Müzik ve deneysel **Sadece ses** (cihazda çalışan [GTCRN](https://github.com/Xiaobin-Rong/gtcrn) modeli, mono, ~50 ms gecikme).
+- **Bu seviyeyi koru:** duyduğun seviye hedef olur; geri alınabilir.
+- **Çıkış cihazı:** işlenen sekmeleri seçtiğin hoparlör veya kulaklıktan çal.
+- **Mono ses** ve **sol / sağ denge**; tek kulaklıkla ya da iki kulağın farklı duyduğu durumlarda kullanışlı.
+- **Kulak koruma:** tepe sesler her ses seviyesinde Hafif (−3 dB), Orta (−6 dB) veya Sıkı (−12 dB) sınırın altında kalır.
+- **Her sitenin ayarlarını hatırla** (yalnızca alan adı).
 - **Kısayollar:** <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> Tonvela'yı açar, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> sesi değiştirir.
-- **İngilizce veya Türkçe** arayüz (Gelişmiş ayarlar → Dil), koyu / açık / sistem teması.
+- **English, Türkçe, Español, Português (Brasil) ve العربية** (sağdan sola); sistem / açık / koyu tema.
 
 ## Kurulum
 
-**Chrome Web Store:** [Tonvela — Volume Control](https://chromewebstore.google.com/detail/hionjhaedpahfidncfeainedjcdkfecn). Mağazadan kurulan eklenti kendiliğinden güncellenir.
+**Chrome Web Store:** [Tonvela - Ses Yükseltici](https://chromewebstore.google.com/detail/hionjhaedpahfidncfeainedjcdkfecn). Mağazadan kurulan eklenti kendiliğinden güncellenir.
 
 **Elle:**
 
 1. [`Tonvela-Chrome.zip`](https://github.com/isolmaz/tonvela-chrome/releases/latest/download/Tonvela-Chrome.zip) dosyasını indirip bir klasöre çıkar.
 2. `chrome://extensions` sayfasını aç ve **Geliştirici modu**nu aç.
 3. **Paketlenmemiş öğe yükle**'ye tıkla ve çıkardığın klasörü seç.
-4. Bir video sekmesinde Tonvela'yı aç ve anahtarı çevir.
+4. Bir video sekmesinde Tonvela'yı aç, ses çubuğunu sürükle ya da bir seviye seç.
 
 ## Gizlilik
 
-Ses tarayıcında işlenir ve dışarı çıkmaz. Sunucu, hesap, analiz, kayıt veya mikrofon yok. Tercihler `chrome.storage.local` içinde kalır. Ayrıntılar: [PRIVACY.md](PRIVACY.md).
+Ses tarayıcında işlenir ve dışarı çıkmaz. Sunucu, hesap, analiz veya kayıt yok. Mikrofon yalnızca çıkış cihazı adlarını görmek istersen istenir ve hemen kapatılır. Tercihler `chrome.storage.local` içinde kalır. Ayrıntılar: [PRIVACY.md](PRIVACY.md).
 
 ## Geliştirme
 

@@ -1,9 +1,9 @@
-import { DEFAULT_SETTINGS, normalizeSettings, siteKey, readableError, rememberSite, applyCommand, createSerialQueue, createPendingWrites } from "./shared.js";
+import { DEFAULT_SETTINGS, normalizeSettings, normalizeListener, isOriginal, siteKey, readableError, rememberSite, applyCommand, createSerialQueue, createPendingWrites } from "./shared.js";
 import { t, loadLocale } from "./i18n.js";
 
 let creation;
 const serialize = createSerialQueue();
-// Slider drags send many updates; persist only the last one per site.
+// Dial drags send many updates; persist only the last one per site.
 const writes = createPendingWrites(({ tab, settings }) => write(tab, settings), 400, flush => serialize(flush).catch(() => {}));
 
 async function exists() {
@@ -23,54 +23,72 @@ async function getSession(tabId) {
   if (!await exists()) return null;
   return (await audio("state", tabId)).state;
 }
-async function saved(tab) {
+async function preferences() {
+  const data = await chrome.storage.local.get(["sites", "listener", "rememberSites"]);
+  return { sites: data.sites || {}, listener: normalizeListener(data.listener), rememberSites: data.rememberSites !== false };
+}
+// A site starts from its remembered settings, otherwise from the original sound.
+async function initial(tab) {
+  const { sites, rememberSites } = await preferences();
   const key = siteKey(tab.url);
-  const data = await chrome.storage.local.get(["preferences", "sites"]);
-  const last = data.preferences || DEFAULT_SETTINGS;
-  return normalizeSettings(last.remember !== false && key && data.sites?.[key] ? data.sites[key] : last);
+  return normalizeSettings(rememberSites && key && sites[key] ? sites[key] : DEFAULT_SETTINGS);
 }
 async function write(tab, settings) {
-  const data = await chrome.storage.local.get("sites");
-  await chrome.storage.local.set({ preferences: settings, sites: rememberSite(data.sites, siteKey(tab.url), settings) });
-}
-// Must run inside serialize(); earlier debounced writes land first.
-async function save(tab, settings) {
-  await writes.flush();
-  await write(tab, settings);
+  const { sites, rememberSites } = await preferences();
+  const key = siteKey(tab.url);
+  if (!rememberSites || !key) return;
+  const isDefault = ["volume", "mode", "targetDb"].every(name => settings[name] === DEFAULT_SETTINGS[name]);
+  const next = isDefault ? { ...sites } : rememberSite(sites, key, settings);
+  if (isDefault) delete next[key];
+  await chrome.storage.local.set({ sites: next });
 }
 async function badge(tabId, settings) {
   await chrome.action.setBadgeBackgroundColor({ tabId, color: "#087F78" });
-  await chrome.action.setBadgeText({ tabId, text: settings ? `${settings.volume}%` : "" });
+  await chrome.action.setBadgeText({ tabId, text: settings ? t("volumePercent", settings.volume) : "" });
   await chrome.action.setTitle({ tabId, title: settings ? t(settings.leveling ? "titleActiveLeveling" : "titleActive", settings.volume) : t("extName") });
 }
 async function closeIfEmpty(tabId) {
   if (await exists() && (await audio("state", tabId)).count === 0) await chrome.offscreen.closeDocument();
 }
-async function start(tab, settings) {
+async function release(tabId) {
+  if (await exists()) { await audio("stop", tabId); await closeIfEmpty(tabId); }
+  await badge(tabId, null).catch(() => {});
+  await chrome.storage.session.remove(`error:${tabId}`);
+}
+async function start(tab, settings, listener) {
   if (!siteKey(tab.url)) throw new Error("errUnsupportedPage");
-  const existing = await getSession(tab.id);
-  if (existing) return (await audio("update", tab.id, { settings })).state;
   await ensureEngine();
   try {
     // Prepare models BEFORE obtaining the short-lived, single-use stream token.
-    await audio("prepare", tab.id, { settings });
+    await audio("prepare", tab.id, { settings, listener });
     const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
     const result = await audio("attach", tab.id, { streamId });
     await chrome.storage.session.remove(`error:${tab.id}`);
-    await save(tab, settings);
-    await badge(tab.id, settings);
     return result.state;
   } catch (error) {
     if (await exists()) { await audio("stop", tab.id).catch(() => {}); await closeIfEmpty(tab.id); }
     throw error;
   }
 }
+// Captures the tab when the settings change its sound. Back at the original sound,
+// a final change releases the capture; intermediate steps of a drag keep it.
+async function apply(tab, settings, final) {
+  const { listener } = await preferences();
+  const current = await getSession(tab.id);
+  const original = isOriginal(settings, listener);
+  let state = null;
+  if (current && original && final) await release(tab.id);
+  else if (current) state = (await audio("update", tab.id, { settings })).state;
+  else if (!original) state = await start(tab, settings, listener);
+  if (state) await badge(tab.id, settings);
+  return state;
+}
 
 async function handle(message) {
   if (message.type === "session-ended") {
     await badge(message.tabId, null).catch(() => {});
     // Closing the tab ends its stream too; onRemoved has already cleaned up and must stay the last word.
-    if (message.error && await chrome.tabs.get(message.tabId).then(() => true, () => false)) await chrome.storage.session.set({ [`error:${message.tabId}`]: readableError(message.error) });
+    if (message.error && await chrome.tabs.get(message.tabId).then(() => true, () => false)) await chrome.storage.session.set({ [`error:${message.tabId}`]: message.error });
     await closeIfEmpty(message.tabId);
     return {};
   }
@@ -79,27 +97,55 @@ async function handle(message) {
   if (message.type === "state") {
     if (writes.size) await serialize(writes.flush);
     const state = await getSession(tab.id);
+    const { listener, rememberSites } = await preferences();
     const errors = await chrome.storage.session.get(`error:${tab.id}`);
-    return { state, settings: state?.settings || await saved(tab), site: siteKey(tab.url), supported: !!siteKey(tab.url), error: errors[`error:${tab.id}`] || null };
+    return { state, settings: state?.settings || await initial(tab), listener, rememberSites, site: siteKey(tab.url), supported: !!siteKey(tab.url), error: errors[`error:${tab.id}`] || null };
   }
-  if (message.type === "start") return { state: await start(tab, normalizeSettings(message.settings)) };
-  if (message.type === "stop") {
-    if (await exists()) { await audio("stop", tab.id); await closeIfEmpty(tab.id); }
-    await badge(tab.id, null);
-    await chrome.storage.session.remove(`error:${tab.id}`);
-    return { state: null };
-  }
-  if (message.type === "update") {
+  if (message.type === "apply") {
     const settings = normalizeSettings(message.settings);
-    const current = await getSession(tab.id);
-    const state = current ? (await audio("update", tab.id, { settings })).state : null;
+    const state = await apply(tab, settings, message.final === true);
     writes.schedule(siteKey(tab.url), { tab, settings });
-    if (current) await badge(tab.id, settings);
     return { state, settings };
   }
+  if (message.type === "listener") {
+    const listener = normalizeListener(message.listener);
+    await chrome.storage.local.set({ listener });
+    if (await exists()) {
+      try { await audio("listener", tab.id, { listener }); }
+      catch (error) {
+        // A device that can't play stays unselected, so the tab isn't captured for it.
+        if (error.message === "errOutputDevice") {
+          const fallback = { ...listener, outputDevice: "" };
+          await chrome.storage.local.set({ listener: fallback });
+          await audio("listener", tab.id, { listener: fallback });
+          const current = await getSession(tab.id);
+          if (current) await apply(tab, current.settings, true);
+        }
+        throw error;
+      }
+    }
+    const current = await getSession(tab.id);
+    return { state: await apply(tab, current?.settings || normalizeSettings(message.settings), true), listener };
+  }
+  if (message.type === "reset") {
+    await writes.flush();
+    await release(tab.id);
+    await write(tab, DEFAULT_SETTINGS);
+    return { state: null, settings: normalizeSettings(DEFAULT_SETTINGS) };
+  }
+  if (message.type === "remember") {
+    const rememberSites = message.rememberSites === true;
+    await writes.flush();
+    await chrome.storage.local.set(rememberSites ? { rememberSites } : { rememberSites, sites: {} });
+    const current = await getSession(tab.id);
+    if (rememberSites && current) await write(tab, current.settings);
+    return { rememberSites };
+  }
   if (message.type === "learn") {
+    if (!await exists()) throw new Error("errStartFirst");
     const result = await audio("learn", tab.id);
-    await save(tab, result.state.settings);
+    await writes.flush();
+    await write(tab, result.state.settings);
     await badge(tab.id, result.state.settings);
     return result;
   }
@@ -134,17 +180,24 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 chrome.commands.onCommand.addListener(command => {
   serialize(async () => {
     await loadLocale().catch(() => {});
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (!tab?.id) return;
     await writes.flush();
     const state = await getSession(tab.id);
-    const settings = applyCommand(state?.settings || await saved(tab), command);
+    const settings = applyCommand(state?.settings || await initial(tab), command);
     if (!settings) return;
-    if (state) { await audio("update", tab.id, { settings }); await badge(tab.id, settings); }
-    else await start(tab, settings);
-    await save(tab, settings);
+    await apply(tab, settings, true);
+    await write(tab, settings);
   }).catch(async error => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id) await chrome.storage.session.set({ [`error:${tab.id}`]: readableError(error) });
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (tab?.id) await chrome.storage.session.set({ [`error:${tab.id}`]: String(error?.message || error) });
   });
+});
+
+// Settings stored under "preferences" carry a global remember flag; keep its choice once, then drop the key.
+chrome.runtime.onInstalled.addListener(async () => {
+  const { preferences: legacy } = await chrome.storage.local.get("preferences");
+  if (!legacy) return;
+  if (legacy.remember === false) await chrome.storage.local.set({ rememberSites: false, sites: {} });
+  await chrome.storage.local.remove("preferences");
 });

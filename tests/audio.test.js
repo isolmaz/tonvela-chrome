@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DynamicsCore } from "../extension/audio/dynamics-core.js";
+import { DynamicsCore, PROTECTION } from "../extension/audio/dynamics-core.js";
 import { normalizeSettings, selectMode, siteKey } from "../extension/shared.js";
 
 const sampleRate = 48000;
@@ -31,6 +31,7 @@ test("settings reject invalid modes, non-finite gain, invalid storage and unsupp
   assert.equal(normalizeSettings({ mode: "constructor" }).mode, "normal");
   assert.equal(selectMode({}, "night").leveling, true);
   assert.equal(selectMode({}, "music").leveling, false);
+  assert.equal(selectMode({ targetDb: -40 }, "night").targetDb, -28, "a mode starts from its own target");
   assert.equal(siteKey("https://www.youtube.com/watch?v=private"), "www.youtube.com");
   assert.equal(siteKey("chrome://extensions"), "");
 });
@@ -90,4 +91,39 @@ test("non-finite audio cannot poison future output", () => {
   run(core, 0.1, n => n % 2 ? NaN : Infinity);
   const clean = run(core, 1, tone(0.1));
   assert.ok(clean.rms > 0.06);
+});
+
+test("mono sends the average of both channels to each ear", () => {
+  const result = run(new DynamicsCore(sampleRate, { volume: 100, mono: true }), 0.5, tone(0.2));
+  const core = new DynamicsCore(sampleRate, { volume: 100, mono: true });
+  const input = [new Float32Array(128).fill(0.4), new Float32Array(128).fill(0)];
+  const output = [new Float32Array(128), new Float32Array(128)];
+  for (let i = 0; i < 10; i++) core.process(input, output);
+  assert.ok(Math.abs(output[0][127] - 0.2) < 1e-6 && Math.abs(output[1][127] - 0.2) < 1e-6, `${output[0][127]} ${output[1][127]}`);
+  assert.ok(result.rms > 0);
+});
+
+test("balance only turns the opposite side down", () => {
+  const input = [new Float32Array(128).fill(0.3), new Float32Array(128).fill(0.3)];
+  const output = [new Float32Array(128), new Float32Array(128)];
+  const right = new DynamicsCore(sampleRate, { volume: 100, balance: 50 });
+  for (let i = 0; i < 10; i++) right.process(input, output);
+  assert.ok(Math.abs(output[0][127] - 0.15) < 1e-6, "left is halved");
+  assert.ok(Math.abs(output[1][127] - 0.3) < 1e-6, "right keeps its level");
+  const left = new DynamicsCore(sampleRate, { volume: 100, balance: -100 });
+  for (let i = 0; i < 10; i++) left.process(input, output);
+  assert.ok(Math.abs(output[0][127] - 0.3) < 1e-6);
+  assert.equal(output[1][127], 0);
+});
+
+test("hearing protection lowers the peak ceiling, and night keeps the lower of both", () => {
+  for (const [protection, ceilingDb] of Object.entries(PROTECTION)) {
+    const result = run(new DynamicsCore(sampleRate, { volume: 400, protection }), 1, tone(0.8));
+    assert.ok(result.peak <= 10 ** (ceilingDb / 20) + 1e-6, `${protection}: ${result.peak}`);
+    assert.ok(result.peak > 10 ** ((ceilingDb - 1) / 20), `${protection} still plays near its ceiling`);
+  }
+  const night = run(new DynamicsCore(sampleRate, { volume: 400, mode: "night", protection: "strict" }), 1, tone(0.8));
+  assert.ok(night.peak <= 10 ** (PROTECTION.strict / 20) + 1e-6);
+  const nightLight = run(new DynamicsCore(sampleRate, { volume: 400, mode: "night", protection: "light" }), 1, tone(0.8));
+  assert.ok(nightLight.peak <= 10 ** (-6 / 20) + 1e-6, "night ceiling stays when protection is lighter");
 });

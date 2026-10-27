@@ -1,4 +1,4 @@
-import { normalizeSettings, clamp } from "./shared.js";
+import { normalizeSettings, normalizeListener, clamp } from "./shared.js";
 
 // chrome.i18n is not available in offscreen documents: errors carry message
 // keys, and the background worker translates them.
@@ -26,10 +26,17 @@ function getContext() {
   return sharedContext;
 }
 
+// Every processed tab plays through the shared context, so they share one output device.
+export async function setOutputDevice(deviceId) {
+  const context = await getContext();
+  if (context.sinkId !== deviceId) await context.setSinkId(deviceId);
+}
+
 export class AudioSession {
-  constructor(tabId, settings, onFailure) {
+  constructor(tabId, settings, listener, onFailure) {
     this.tabId = tabId;
     this.settings = normalizeSettings(settings);
+    this.listener = normalizeListener(listener);
     this.onFailure = onFailure;
     this.history = [];
     this.measureAfter = 0;
@@ -41,7 +48,7 @@ export class AudioSession {
   async prepare() {
     this.context = await getContext();
     const ctx = this.context;
-    this.dynamics = new AudioWorkletNode(ctx, "tonvela-dynamics", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], channelCount: 2, channelCountMode: "explicit", processorOptions: { settings: this.settings } });
+    this.dynamics = new AudioWorkletNode(ctx, "tonvela-dynamics", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], channelCount: 2, channelCountMode: "explicit", processorOptions: { settings: this.dynamicsSettings() } });
     this.dynamics.port.onmessage = ({ data }) => {
       if (data.type !== "meter") return;
       this.meter = { inputDb: db(data.inputPower), outputDb: db(data.outputPower), peak: data.peak, gain: data.gain, limiting: data.limiting, atLimit: data.atLimit };
@@ -59,7 +66,6 @@ export class AudioSession {
   }
 
   async makeVoice() {
-    if (this.context.sampleRate !== 48000) throw new Error("errModel48k");
     const binary = await getModel();
     const worker = new Worker(new URL("audio/voice-worker.js", import.meta.url), { type: "module" });
     const channel = new MessageChannel();
@@ -89,7 +95,6 @@ export class AudioSession {
 
   disposeVoice(voice) {
     if (!voice) return;
-    voice.worker.postMessage({ type: "dispose" });
     voice.worker.terminate();
     if (voice.node) {
       voice.node.port.postMessage({ type: "dispose" });
@@ -107,6 +112,15 @@ export class AudioSession {
     await this.context.resume();
     if (this.context.state !== "running") throw new Error("errEngineStart");
     this.fader.gain.setTargetAtTime(1, this.context.currentTime, 0.018);
+  }
+
+  dynamicsSettings() {
+    return { ...this.settings, ...this.listener };
+  }
+
+  setListener(listener) {
+    this.listener = normalizeListener(listener);
+    this.dynamics?.port.postMessage({ type: "settings", settings: this.dynamicsSettings() });
   }
 
   connectSource() {
@@ -147,7 +161,7 @@ export class AudioSession {
     }
     this.settings = next;
     this.configureFilters();
-    this.dynamics.port.postMessage({ type: "settings", settings: next });
+    this.dynamics.port.postMessage({ type: "settings", settings: this.dynamicsSettings() });
     if (this.context.state === "suspended") await this.context.resume();
     return this.snapshot();
   }
@@ -158,7 +172,7 @@ export class AudioSession {
     if (recent.length < 8) throw new Error("errNeedAudio");
     const power = recent.reduce((sum, point) => sum + point.power, 0) / recent.length;
     const targetDb = clamp(db(power) - 20 * Math.log10(this.settings.volume / 100), -48, -6);
-    return this.update({ ...this.settings, leveling: true, targetDb });
+    return this.update({ ...this.settings, mode: this.settings.leveling ? this.settings.mode : "steady", targetDb });
   }
 
   snapshot() {

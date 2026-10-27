@@ -30,7 +30,7 @@ class TonvelaVoice extends AudioWorkletProcessor {
     this.queue.push(this.seq, frame, !!this.model);
     if (this.model) {
       const copy = frame.slice();
-      this.model.postMessage({ seq: this.seq, samples: copy }, [copy.buffer]);
+      this.model.postMessage({ seq: this.seq, samples: copy, sentAt: Date.now() }, [copy.buffer]);
     }
     this.seq++;
     this.playing = this.queue.take(this.seq - this.queue.delay);

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { VoiceFrameQueue, VOICE_FRAME } from "../extension/audio/voice-buffer.js";
+import { VoiceFrameQueue, VOICE_FRAME, VOICE_BUDGET_MS, isStale } from "../extension/audio/voice-buffer.js";
 
 const frame = value => new Float32Array(VOICE_FRAME).fill(value);
 
@@ -40,4 +40,10 @@ test("buffers stay bounded while frames flow", () => {
     queue.take(seq - 3);
   }
   assert.ok(queue.dry.size <= 3 && queue.wet.size <= 3);
+});
+
+test("the worker skips frames that can no longer play processed", () => {
+  assert.equal(VOICE_BUDGET_MS, 48, "three 768-sample frames at 48 kHz");
+  assert.equal(isStale(1000, 1000 + VOICE_BUDGET_MS), false);
+  assert.equal(isStale(1000, 1001 + VOICE_BUDGET_MS), true);
 });

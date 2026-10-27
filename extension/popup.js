@@ -1,22 +1,26 @@
-import { MODES, DEFAULT_SETTINGS, normalizeSettings, selectMode, clamp } from "./shared.js";
-import { t, localizePage, loadLocale, saveLanguage, currentLanguage } from "./i18n.js";
+import { MODES, PROTECTION, VOLUME_PRESETS, DEFAULT_SETTINGS, DEFAULT_LISTENER, normalizeSettings, normalizeListener, selectMode, isOriginal, readableError, clamp } from "./shared.js";
+import { t, localizePage, loadLocale, saveLanguage, currentLanguage, LANGUAGES } from "./i18n.js";
 import { saveTheme } from "./theme.js";
 
 const $ = id => document.getElementById(id);
+const COMMIT_DELAY = 600;
 let tabId;
 let settings = { ...DEFAULT_SETTINGS };
+let listener = { ...DEFAULT_LISTENER };
+let rememberSites = true;
 let active = false;
 let supported = false;
-let busy = false;
-let revision = 0;
+let starting = false;
 let pending = 0;
-let updateTimer;
+let revision = 0;
+let sendTimer;
+let commitTimer;
+let balanceTimer;
 let feedbackTimer;
 let undoAction = null;
 let meterPort = null;
 let lastState = null;
-let renderedKey = "";
-let meterView = { amount: -1, note: "" };
+let opener = null;
 
 async function request(type, extra = {}) {
   const response = await chrome.runtime.sendMessage({ target: "background", type, tabId, ...extra });
@@ -36,62 +40,104 @@ function feedback(text, undo = null) {
 // "yerel-dosya" is the stored site key for file: pages; show it in the chosen language.
 function siteLabel(site) { return site === "yerel-dosya" ? t("localFile") : site || t("openInVideoTab"); }
 function updateFill(input) { input.style.setProperty("--fill", `${100 * (Number(input.value) - Number(input.min)) / (Number(input.max) - Number(input.min))}%`); }
+// Keyboard focus moves into the new view, and back to the row that opened it.
+function show(view) {
+  if (view !== "main-view") opener = document.activeElement;
+  for (const section of document.querySelectorAll(".view")) section.hidden = section.id !== view;
+  document.querySelector("main").scrollTop = 0;
+  if (view === "main-view") opener?.focus();
+  else $(view).querySelector("[data-back]").focus();
+}
+
+function buildControls() {
+  $("presets").replaceChildren(...VOLUME_PRESETS.map(volume => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.volume = volume;
+    return button;
+  }));
+  $("modes").replaceChildren(...Object.entries(MODES).map(([mode, info]) => {
+    const label = document.createElement("label");
+    label.className = "row mode-row";
+    label.innerHTML = `<span class="row-label"><svg class="accent-icon" aria-hidden="true"><use href="#${info.icon}"/></svg><span class="mode-text"><span></span><small></small></span></span><input type="radio" name="mode" value="${mode}"><svg class="mode-check" aria-hidden="true"><use href="#check"/></svg>`;
+    return label;
+  }));
+  $("protection").replaceChildren(...Object.keys(PROTECTION).map(level => {
+    const label = document.createElement("label");
+    label.innerHTML = `<input type="radio" name="protection" value="${level}"><span></span>`;
+    return label;
+  }));
+  $("language").replaceChildren(...Object.entries(LANGUAGES).map(([code, name]) => new Option(name, code)));
+}
+
+// Text that depends on the interface language.
+function localizeControls() {
+  localizePage();
+  for (const button of $("presets").children) button.textContent = t("volumePercent", button.dataset.volume);
+  for (const label of $("modes").children) {
+    const info = MODES[label.querySelector("input").value];
+    label.querySelector(".mode-text > span").textContent = t(info.name);
+    label.querySelector(".mode-text > small").textContent = t(info.description);
+  }
+  for (const label of $("protection").children) label.querySelector("span").textContent = t(`protection_${label.querySelector("input").value}`);
+  if ("site" in $("site").dataset) $("site").textContent = siteLabel($("site").dataset.site);
+}
+
+function statusKey(meter) {
+  if (!supported) return "offDescUnsupported";
+  if (starting || (!active && (sendTimer || commitTimer) && !isOriginal(settings, listener))) return "statusPreparing";
+  if (!active) return "statusOriginal";
+  if (settings.volume === 0) return "statusMuted";
+  if (meter?.voiceLate) return "meterVoiceLate";
+  if (meter?.limiting > 0.08) return "meterLimiting";
+  if (meter?.atLimit) return "meterAtLimit";
+  if (!meter || meter.inputDb < -58) return "meterWaiting";
+  return settings.leveling ? "meterLeveling" : "meterProcessing";
+}
+function renderStatus() {
+  const text = t(statusKey(lastState?.meter));
+  if ($("status-text").textContent !== text) $("status-text").textContent = text;
+  $("status-text").classList.toggle("active", active && !starting);
+}
 
 function render() {
-  renderedKey = JSON.stringify([active, settings]);
-  $("controls").hidden = !active;
-  $("off-state").hidden = active;
-  $("off-description").textContent = t(supported ? "offDescSupported" : "offDescUnsupported");
-  if (!active) $("advanced").open = false;
-  $("current-mode").textContent = t(MODES[settings.mode].name);
-  $("volume").value = settings.volume;
   $("volume-value").textContent = settings.volume;
+  $("volume-fill").style.width = `${settings.volume / 4}%`;
+  $("volume").classList.toggle("low", settings.volume < 40);
+  $("volume-icon").setAttribute("href", settings.volume ? "#speaker" : "#speaker-off");
+  $("volume").setAttribute("aria-valuenow", String(settings.volume));
   $("volume").setAttribute("aria-valuetext", t("volumePercent", settings.volume));
-  updateFill($("volume"));
-  for (const radio of document.querySelectorAll('input[name="mode"]')) { radio.checked = radio.value === settings.mode; radio.disabled = busy; }
-  $("mode-description").textContent = t(MODES[settings.mode].description);
-  $("mode-tag").textContent = t(settings.mode === "voice" ? "tagVoice" : settings.mode === "music" ? "tagMusic" : settings.mode === "night" ? "tagNight" : settings.leveling ? "tagLeveled" : "tagNatural");
-  $("leveling").checked = settings.leveling;
-  $("leveling").disabled = busy;
-  $("target-hint").hidden = settings.leveling;
+  $("volume").setAttribute("aria-disabled", String(!supported));
+  $("volume").tabIndex = supported ? 0 : -1;
+  for (const button of $("presets").children) {
+    button.disabled = !supported;
+    button.setAttribute("aria-pressed", String(Number(button.dataset.volume) === settings.volume));
+  }
+  const mode = MODES[settings.mode];
+  $("mode-name").textContent = t(mode.name);
+  $("mode-icon").setAttribute("href", `#${mode.icon}`);
+  $("open-modes").disabled = !supported;
+  for (const radio of document.querySelectorAll('input[name="mode"]')) { radio.checked = radio.value === settings.mode; radio.disabled = !supported || starting; }
+  $("target-panel").hidden = !settings.leveling;
   $("target").value = settings.targetDb;
   $("target-value").textContent = `${Math.round((settings.targetDb + 48) / 42 * 100)} / 100`;
   $("target").setAttribute("aria-valuetext", t("targetValueText", $("target-value").textContent));
   updateFill($("target"));
-  $("remember").checked = settings.remember;
-  $("power-button").disabled = busy || (!supported && !active);
-  $("power-button").setAttribute("aria-checked", String(active));
-  $("power-label").textContent = t(busy ? "powerWait" : active ? "powerOn" : "powerOff");
-  $("learn").disabled = busy || !active;
-  $("reset").disabled = busy;
-  $("undo").disabled = busy;
-  $("volume").disabled = busy;
-  $("target").disabled = busy || !settings.leveling;
-  $("remember").disabled = busy;
-  for (const button of document.querySelectorAll("[data-volume]")) {
-    button.disabled = busy;
-    button.textContent = t("volumePercent", button.dataset.volume);
-    button.setAttribute("aria-pressed", String(Number(button.dataset.volume) === settings.volume));
-  }
-  $("status-dot").classList.toggle("active", active);
-  $("status-text").textContent = t(busy ? "statusPreparing" : active ? "statusActive" : supported ? "statusReady" : "statusUnsupported");
+  $("learn").disabled = !active || starting;
+  $("original").classList.toggle("concealed", !supported || (!active && isOriginal(settings, listener)));
+  $("original").disabled = starting;
+  $("mono").checked = listener.mono;
+  $("balance").value = listener.balance;
+  $("balance-center").hidden = listener.balance === 0;
+  $("balance").setAttribute("aria-valuetext", listener.balance ? t(listener.balance < 0 ? "balanceLeftValue" : "balanceRightValue", Math.abs(listener.balance)) : t("center"));
+  for (const radio of document.querySelectorAll('input[name="protection"]')) radio.checked = radio.value === listener.protection;
+  $("remember").checked = rememberSites;
+  $("output-device").value = [...$("output-device").options].some(option => option.value === listener.outputDevice) ? listener.outputDevice : "";
+  renderStatus();
 }
-// Meter snapshots arrive several times a second; touch the DOM only when something visible changed.
-function renderMeter(state) {
-  lastState = state;
-  const meter = state?.meter;
-  const amount = Math.round(meter && active ? clamp((meter.outputDb + 60) / 54 * 100, 0, 100) : 0);
-  const note = t(!active ? "meterStart" : meter?.voiceLate ? "meterVoiceLate" : meter?.limiting > 0.08 ? "meterLimiting" : meter?.atLimit ? "meterAtLimit" : !meter || meter.inputDb < -58 ? "meterWaiting" : settings.leveling ? "meterLeveling" : "meterProcessing");
-  if (amount !== meterView.amount) {
-    $("meter-fill").style.transform = `scaleX(${amount / 100})`;
-    document.querySelector(".meter").setAttribute("aria-valuenow", String(amount));
-  }
-  if (note !== meterView.note) $("meter-note").textContent = note;
-  meterView = { amount, note };
-}
-const settled = () => !busy && !pending && !updateTimer;
+const settled = () => !starting && !pending && !sendTimer && !commitTimer;
 
-// Live meter: the engine pushes snapshots while this popup is open.
+// Live status: the engine pushes snapshots while this popup is open.
 function connectMeter() {
   if (meterPort || !active || !tabId) return;
   const port = chrome.runtime.connect({ name: "meter" });
@@ -103,16 +149,17 @@ function connectMeter() {
       refresh();
       return;
     }
+    lastState = state;
     if (settled()) {
       const next = normalizeSettings(state.settings);
-      const key = JSON.stringify([!!state.active, next]);
-      if (key !== renderedKey) {
+      if (!state.active !== !active || JSON.stringify(next) !== JSON.stringify(settings)) {
         active = !!state.active;
         settings = next;
         render();
+        return;
       }
     }
-    renderMeter(state);
+    renderStatus();
   });
   port.onDisconnect.addListener(() => {
     void chrome.runtime.lastError;
@@ -123,6 +170,17 @@ function connectMeter() {
   port.postMessage({ tabId });
 }
 
+function showState(response) {
+  active = !!response.state?.active;
+  lastState = response.state || null;
+  if (!active) {
+    meterPort?.disconnect();
+    meterPort = null;
+  }
+  render();
+  connectMeter();
+}
+
 async function refresh() {
   if (!tabId || !settled()) return;
   const before = revision;
@@ -130,128 +188,226 @@ async function refresh() {
     const response = await request("state");
     if (before !== revision || !settled()) return;
     supported = response.supported;
-    active = !!response.state?.active;
     settings = normalizeSettings(response.settings);
+    listener = normalizeListener(response.listener);
+    rememberSites = response.rememberSites;
     $("site").dataset.site = response.site || "";
     $("site").textContent = siteLabel(response.site);
-    if (response.error) error(response.error);
-    render();
-    renderMeter(response.state);
-    connectMeter();
+    if (response.error) error(readableError(response.error));
+    showState(response);
   } catch (cause) { error(cause.message); }
 }
 
-async function saveChange() {
-  clearTimeout(updateTimer);
-  updateTimer = null;
+// Sends the current settings. `final` marks the end of an interaction, which
+// releases the capture when the sound is back to the original.
+async function send(final) {
+  clearTimeout(sendTimer);
+  sendTimer = null;
   const current = ++revision;
   const value = { ...settings };
+  const capturing = !active && !isOriginal(value, listener);
+  if (capturing) { starting = true; render(); }
   pending++;
   try {
-    const response = await request("update", { settings: value });
+    const response = await request("apply", { settings: value, final });
     if (current === revision) {
-      active = !!response.state?.active;
-      settings = normalizeSettings(response.settings || response.state?.settings || value);
-      render();
+      settings = normalizeSettings(response.settings);
+      showState(response);
     }
   } catch (cause) {
     error(cause.message);
-  } finally { pending--; }
+  } finally {
+    pending--;
+    if (capturing) { starting = false; render(); }
+  }
 }
-function changed(immediate = false) {
+function change(next, final) {
+  settings = normalizeSettings(next);
   revision++;
   error();
+  clearTimeout(sendTimer);
+  clearTimeout(commitTimer);
+  commitTimer = null;
+  sendTimer = final ? null : setTimeout(() => send(false), 60);
   render();
-  clearTimeout(updateTimer);
-  if (immediate) return saveChange();
-  updateTimer = setTimeout(saveChange, 70);
+  if (final) return send(true);
 }
-async function action(operation) {
-  if (busy) return;
-  clearTimeout(updateTimer);
-  updateTimer = null;
-  busy = true;
-  revision++;
-  error();
-  render();
-  try { await operation(); }
-  catch (cause) { error(cause.message); }
-  finally { busy = false; render(); await refresh(); }
+// Wheel and keyboard steps have no end event; commit after a short pause.
+function stepVolume(volume) {
+  change({ ...settings, volume: clamp(volume, 0, 400) }, false);
+  commitTimer = setTimeout(() => { commitTimer = null; send(true); }, COMMIT_DELAY);
 }
 
-$("volume").addEventListener("input", () => { settings.volume = Number($("volume").value); changed(); });
-$("volume").addEventListener("change", saveChange);
-$("target").addEventListener("input", () => { settings.targetDb = Number($("target").value); changed(); });
-$("target").addEventListener("change", saveChange);
-document.querySelectorAll("[data-volume]").forEach(button => button.addEventListener("click", () => { settings.volume = Number(button.dataset.volume); changed(true); }));
-document.querySelectorAll('input[name="mode"]').forEach(radio => radio.addEventListener("change", () => action(async () => {
-  settings = selectMode(settings, radio.value);
+async function saveListener(next) {
+  listener = normalizeListener(next);
+  const current = ++revision;
+  error();
   render();
-  const response = await request("update", { settings });
-  settings = normalizeSettings(response.settings || response.state?.settings);
-})));
-$("leveling").addEventListener("change", () => {
-  settings.leveling = $("leveling").checked;
-  if (!settings.leveling && settings.mode === "steady") settings.mode = "normal";
-  changed(true);
+  const capturing = !active && !isOriginal(settings, listener);
+  if (capturing) { starting = true; render(); }
+  pending++;
+  let failed = false;
+  try {
+    const response = await request("listener", { listener, settings });
+    if (current === revision) {
+      listener = normalizeListener(response.listener);
+      showState(response);
+    }
+  } catch (cause) {
+    error(cause.message);
+    failed = true;
+  } finally {
+    pending--;
+    if (capturing) { starting = false; render(); }
+  }
+  // The background may have kept a different choice, such as the default device.
+  if (failed) await refresh();
+}
+
+const rightToLeft = () => document.documentElement.dir === "rtl";
+function volumeFromPointer(event) {
+  const box = $("volume").getBoundingClientRect();
+  const along = rightToLeft() ? box.right - event.clientX : event.clientX - box.left;
+  return Math.round(clamp(along / box.width, 0, 1) * 400 / 5) * 5;
+}
+let dragging = false;
+$("volume").addEventListener("pointerdown", event => {
+  if (!supported) return;
+  dragging = true;
+  $("volume").setPointerCapture(event.pointerId);
+  $("volume").classList.add("dragging");
+  change({ ...settings, volume: volumeFromPointer(event) }, false);
 });
-$("remember").addEventListener("change", () => { settings.remember = $("remember").checked; changed(true); });
-$("advanced").addEventListener("toggle", () => {
-  if ($("advanced").open) $("advanced").querySelector("summary").scrollIntoView({ block: "start" });
-  else document.querySelector(".content").scrollTop = 0;
+$("volume").addEventListener("pointermove", event => { if (dragging) change({ ...settings, volume: volumeFromPointer(event) }, false); });
+function endDrag() {
+  if (!dragging) return;
+  dragging = false;
+  $("volume").classList.remove("dragging");
+  change(settings, true);
+}
+$("volume").addEventListener("pointerup", endDrag);
+$("volume").addEventListener("pointercancel", endDrag);
+$("volume").addEventListener("lostpointercapture", endDrag);
+// Closing the popup mid-change still ends the interaction, so a return to the
+// original sound releases the capture.
+addEventListener("pagehide", () => { if (dragging || sendTimer || commitTimer) send(true); });
+$("volume").addEventListener("wheel", event => {
+  if (!supported) return;
+  event.preventDefault();
+  stepVolume(settings.volume + (event.deltaY < 0 ? 5 : -5));
+}, { passive: false });
+$("volume").addEventListener("keydown", event => {
+  if (!supported) return;
+  const forward = rightToLeft() ? "ArrowLeft" : "ArrowRight";
+  const backward = rightToLeft() ? "ArrowRight" : "ArrowLeft";
+  const steps = { ArrowUp: 5, [forward]: 5, ArrowDown: -5, [backward]: -5, PageUp: 50, PageDown: -50 };
+  if (event.key in steps) stepVolume(settings.volume + steps[event.key]);
+  else if (event.key === "Home") stepVolume(0);
+  else if (event.key === "End") stepVolume(400);
+  else return;
+  event.preventDefault();
+});
+$("presets").addEventListener("click", event => {
+  const button = event.target.closest("button[data-volume]");
+  if (button) change({ ...settings, volume: Number(button.dataset.volume) }, true);
+});
+$("modes").addEventListener("change", event => change(selectMode(settings, event.target.value), true));
+$("target").addEventListener("input", () => change({ ...settings, targetDb: Number($("target").value) }, false));
+$("target").addEventListener("change", () => change(settings, true));
+
+$("learn").addEventListener("click", async () => {
+  const previous = { ...settings };
+  revision++;
+  pending++;
+  try {
+    const response = await request("learn");
+    settings = normalizeSettings(response.state.settings);
+    showState(response);
+    feedback(t("learnedFeedback"), () => change(previous, true).then(() => feedback(t("undoneFeedback"))));
+  } catch (cause) { error(cause.message); }
+  finally { pending--; }
+});
+$("undo").addEventListener("click", () => {
+  const undo = undoAction;
+  hideFeedback();
+  undo?.();
+});
+$("original").addEventListener("click", async () => {
+  clearTimeout(sendTimer);
+  clearTimeout(commitTimer);
+  sendTimer = commitTimer = null;
+  revision++;
+  error();
+  hideFeedback();
+  pending++;
+  try {
+    const response = await request("reset");
+    settings = normalizeSettings(response.settings);
+    showState(response);
+  } catch (cause) { error(cause.message); }
+  finally { pending--; }
+});
+
+$("open-modes").addEventListener("click", () => show("modes-view"));
+$("open-settings").addEventListener("click", () => { show("settings-view"); listDevices(); });
+for (const button of document.querySelectorAll("[data-back]")) button.addEventListener("click", () => show("main-view"));
+$("mono").addEventListener("change", () => saveListener({ ...listener, mono: $("mono").checked }));
+$("balance").addEventListener("input", () => {
+  listener = { ...listener, balance: Number($("balance").value) };
+  revision++;
+  render();
+  clearTimeout(balanceTimer);
+  balanceTimer = setTimeout(() => saveListener(listener), 150);
+});
+$("balance-center").addEventListener("click", () => saveListener({ ...listener, balance: 0 }));
+$("protection").addEventListener("change", event => saveListener({ ...listener, protection: event.target.value }));
+$("output-device").addEventListener("change", () => saveListener({ ...listener, outputDevice: $("output-device").value }));
+$("device-names").addEventListener("click", () => chrome.tabs.create({ url: chrome.runtime.getURL("devices.html") }));
+$("remember").addEventListener("change", async () => {
+  try { rememberSites = (await request("remember", { rememberSites: $("remember").checked })).rememberSites; }
+  catch (cause) { error(cause.message); }
+  render();
 });
 $("theme").addEventListener("change", async () => {
   try { await saveTheme($("theme").value); }
   catch { error(t("errThemeSave")); }
 });
-$("power-button").addEventListener("click", () => action(async () => {
-  if (active) await request("update", { settings });
-  const response = await request(active ? "stop" : "start", { settings });
-  active = !!response.state?.active;
-  if (!active) {
-    hideFeedback();
-    document.querySelector(".content").scrollTop = 0;
-  }
-}));
-$("learn").addEventListener("click", () => action(async () => {
-  const previous = { ...settings };
-  const response = await request("learn");
-  settings = normalizeSettings(response.state.settings);
-  feedback(t("learnedFeedback"), async () => {
-    const restored = await request("update", { settings: previous });
-    settings = normalizeSettings(restored.settings || previous);
-    feedback(t("undoneFeedback"));
-  });
-}));
-$("undo").addEventListener("click", () => {
-  const undo = undoAction;
-  hideFeedback();
-  if (undo) action(undo);
-});
-$("reset").addEventListener("click", () => action(async () => {
-  settings = { ...DEFAULT_SETTINGS, remember: settings.remember };
-  await request("update", { settings });
-  feedback(t("resetFeedback"));
-  document.querySelector(".content").scrollTop = 0;
-}));
 $("language").addEventListener("change", async () => {
   try { await saveLanguage($("language").value); }
   catch { $("language").value = currentLanguage(); return; }
-  localizePage();
-  $("site").textContent = siteLabel($("site").dataset.site);
-  meterView = { amount: -1, note: "" };
-  render();
-  renderMeter(lastState);
+  localizeControls();
+  listDevices();
 });
 $("help").addEventListener("click", () => chrome.tabs.create({ url: chrome.runtime.getURL(t("helpPage")) }));
 $("shortcuts").addEventListener("click", () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" }));
 
+// Without a granted device permission Chrome hides output names, so only the default is listed.
+async function listDevices() {
+  let outputs = [];
+  try { outputs = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === "audiooutput" && device.deviceId && device.deviceId !== "default"); }
+  catch { outputs = []; }
+  const named = outputs.filter(device => device.label);
+  const select = $("output-device");
+  select.replaceChildren(new Option(t("defaultDevice"), ""), ...named.map(device => new Option(device.label, device.deviceId)));
+  if (listener.outputDevice && !named.some(device => device.deviceId === listener.outputDevice)) select.append(new Option(t("savedDevice"), listener.outputDevice));
+  $("device-names").hidden = named.length > 0;
+  render();
+}
+navigator.mediaDevices?.addEventListener("devicechange", () => { if (!$("settings-view").hidden) listDevices(); });
+
+buildControls();
 await loadLocale().catch(() => {});
-localizePage();
+localizeControls();
 $("language").value = currentLanguage();
+render();
 try {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error(t("errNoTab"));
   tabId = tab.id;
   await refresh();
-} catch (cause) { error(cause.message); }
+  // Opening Tonvela applies a site's remembered sound, or the listener preferences.
+  if (supported && !active && !isOriginal(settings, listener)) await send(true);
+} catch (cause) {
+  $("site").textContent = siteLabel("");
+  error(cause.message);
+}

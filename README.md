@@ -19,40 +19,43 @@ A Chrome extension that boosts, levels and clarifies tab audio — entirely on y
 
 <table>
 <tr>
-<td width="33%" align="center"><img src="docs/media/turn-on.gif" alt="Turning Tonvela on: the switch reveals the volume controls and a live meter"></td>
-<td width="33%" align="center"><img src="docs/media/level.gif" alt="Boosting to 400%, turning on Keep volume steady, then Keep this level with undo"></td>
-<td width="33%" align="center"><img src="docs/media/settings.gif" alt="Advanced settings: listening modes, light theme and Turkish interface"></td>
+<td width="33%" align="center"><img src="docs/media/volume.gif" alt="Raising the volume with the bar, picking 400%, then Back to original sound"></td>
+<td width="33%" align="center"><img src="docs/media/modes.gif" alt="Opening Listening mode and choosing Steady, Speech, Night and Music"></td>
+<td width="33%" align="center"><img src="docs/media/settings.gif" alt="Settings: mono sound, hearing protection, dark theme and Turkish interface"></td>
 </tr>
 <tr>
-<td align="center"><b>1. Turn it on</b><br>Flip the switch on a video tab. The meter shows what you hear.</td>
-<td align="center"><b>2. Boost and level</b><br>Up to 400%. <i>Keep volume steady</i> evens out loud and quiet parts; <i>Keep this level</i> locks in what you hear now.</td>
-<td align="center"><b>3. Fine-tune</b><br>Six listening modes, target level, per-site memory, theme and language.</td>
+<td align="center"><b>1. Turn it up</b><br>Drag the bar or pick 100%, 200% or 400%. Tonvela starts when the sound changes; <i>Back to original sound</i> undoes it.</td>
+<td align="center"><b>2. Choose how it sounds</b><br>Steady evens out loud and quiet parts, Speech brings voices forward, Night keeps peaks soft.</td>
+<td align="center"><b>3. Make it yours</b><br>Output device, mono, balance, hearing protection, per-site memory, theme and language.</td>
 </tr>
 </table>
 
 ## Features
 
 - **Up to 400% volume** with a look-ahead peak limiter.
-- **Keep volume steady:** quiet parts come up, loud parts come down.
+- **Listening modes:** Normal, Steady, Speech, Night, Music and experimental **Voice only** (on-device [GTCRN](https://github.com/Xiaobin-Rong/gtcrn) speech model, mono, ~50 ms delay).
 - **Keep this level:** the level you're hearing becomes the target, with undo.
-- **Six modes:** Normal, Steady, Speech, Night, Music and experimental **Voice only** (on-device [GTCRN](https://github.com/Xiaobin-Rong/gtcrn) speech model, mono, ~50 ms delay).
+- **Output device:** play processed tabs on a chosen speaker or headset.
+- **Mono sound** and **left / right balance**, useful with one earbud or uneven hearing.
+- **Hearing protection:** peaks stay under Light (−3 dB), Medium (−6 dB) or Strict (−12 dB) at any volume.
+- **Remember settings for each site** (domain names only).
 - **Shortcuts:** <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> opens Tonvela, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> change volume.
-- **English or Turkish**, dark / light / system theme.
+- **English, Türkçe, Español, Português (Brasil) and العربية** (right to left); system / light / dark theme.
 
 ## Install
 
-**Chrome Web Store:** [Tonvela — Volume Control](https://chromewebstore.google.com/detail/hionjhaedpahfidncfeainedjcdkfecn). Store installs update automatically.
+**Chrome Web Store:** [Tonvela - Volume Booster](https://chromewebstore.google.com/detail/hionjhaedpahfidncfeainedjcdkfecn). Store installs update automatically.
 
 **Manually:**
 
 1. Download and extract [`Tonvela-Chrome.zip`](https://github.com/isolmaz/tonvela-chrome/releases/latest/download/Tonvela-Chrome.zip).
 2. Open `chrome://extensions` and turn on **Developer mode**.
 3. Click **Load unpacked** and select the extracted folder.
-4. On a video tab, open Tonvela and flip the switch.
+4. On a video tab, open Tonvela and drag the volume bar or pick a level.
 
 ## Privacy
 
-Audio is processed in your browser and never leaves it. No servers, accounts, analytics, recording or microphone. Preferences stay in `chrome.storage.local`. Details: [PRIVACY.md](PRIVACY.md).
+Audio is processed in your browser and never leaves it. No servers, accounts, analytics or recording. The microphone is only asked for if you want to see output device names, and it is closed right away. Preferences stay in `chrome.storage.local`. Details: [PRIVACY.md](PRIVACY.md).
 
 ## Development
 

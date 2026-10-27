@@ -3,6 +3,10 @@
 // leaving a gap, and counts as late.
 export const VOICE_FRAME = 768;
 export const VOICE_DELAY_FRAMES = 3;
+// A frame the worker starts later than this after it was sent can no longer play
+// processed, so the worker skips it instead of falling further behind.
+export const VOICE_BUDGET_MS = VOICE_DELAY_FRAMES * VOICE_FRAME / 48;
+export const isStale = (sentAt, now) => now - sentAt > VOICE_BUDGET_MS;
 
 export class VoiceFrameQueue {
   constructor(delay = VOICE_DELAY_FRAMES) {

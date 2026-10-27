@@ -9,69 +9,87 @@
     <symbol id="moon" viewBox="0 0 24 24"><path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10Z"/></symbol>
     <symbol id="music" viewBox="0 0 24 24"><path d="M9 17V5l11-2v12M9 8l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2"/><ellipse cx="17" cy="16" rx="3" ry="2"/></symbol>
     <symbol id="spark" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Zm8-1v4m-2-2h4"/></symbol>
-    <symbol id="icon-reset" viewBox="0 0 24 24"><path d="M4 5v6h6M4 11a8 8 0 1 1 2 7"/></symbol>
-    <symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></symbol>
-    <symbol id="chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="speaker" viewBox="0 0 24 24"><path d="M4 9h3l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6m2.5-8.5a7.5 7.5 0 0 1 0 11"/></symbol>
+    <symbol id="speaker-off" viewBox="0 0 24 24"><path d="M4 9h3l5-4v14l-5-4H4zM16 9l5 6m0-6-5 6"/></symbol>
+    <symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.4-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6A7 7 0 0 0 19 12Z"/></symbol>
+    <symbol id="chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="back" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></symbol>
+    <symbol id="check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
+    <symbol id="external" viewBox="0 0 24 24"><path d="M8 16 16 8m-6 0h6v6"/></symbol>
   </svg>
   <main>
-    <header>
-      <div class="brand"><div class="brand-mark"><svg><use href="#wave"/></svg></div><div><h1>Tonvela<span>.</span></h1><p data-i18n="tagline"></p></div></div>
-      <button id="power-button" class="power-button" type="button" role="switch" aria-checked="false" data-i18n-attr="aria-label:powerAria" aria-controls="controls" disabled><span id="power-label"></span><span class="switch-track" aria-hidden="true"></span></button>
-    </header>
-    <div class="session-strip"><span id="site" data-i18n="loadingTab"></span><span class="status"><i id="status-dot"></i><span id="status-text" role="status" data-i18n="statusPreparing"></span></span></div>
-    <div class="content">
+    <div class="notices">
       <div id="error" class="notice error" role="alert" hidden></div>
-      <div id="feedback" class="notice feedback" role="status" hidden><span id="feedback-text"></span><button id="undo" class="undo-button" type="button" data-i18n="undo" hidden></button></div>
-      <section id="off-state" class="off-state" data-i18n-attr="aria-label:offAria">
-        <p class="off-title" data-i18n="offTitle"></p>
-        <p id="off-description"></p>
-      </section>
-      <div id="controls" hidden>
-        <section class="volume-section" aria-labelledby="volume-label">
-          <div class="section-heading"><label id="volume-label" for="volume" data-i18n="volumeLabel"></label><span id="current-mode" class="badge"></span></div>
-          <div class="volume-value"><output id="volume-value" for="volume">100</output><span>%</span></div>
-          <input id="volume" class="range" type="range" min="0" max="400" step="1" value="100" aria-describedby="volume-help">
-          <div class="range-labels" id="volume-help"><span>0</span><span>100</span><span>200</span><span>300</span><span>400</span></div>
-          <div class="quick-row"><button type="button" data-volume="100">%100</button><button type="button" data-volume="200">%200</button><button type="button" data-volume="400">%400</button><span data-i18n="upTo4x"></span></div>
-        </section>
-        <section class="level-section" data-i18n-attr="aria-label:levelingAria">
-          <div class="level-heading"><div><label for="leveling" data-i18n="levelingLabel"></label><p data-i18n="levelingHint"></p></div><label class="switch"><input id="leveling" type="checkbox" role="switch"><span class="switch-track" aria-hidden="true"></span></label></div>
-          <button id="learn" class="learn-button" type="button" data-i18n-attr="title:learnTitle" disabled><svg><use href="#lock"/></svg><span data-i18n="learnButton"></span></button>
-          <div class="meter-row"><div class="meter" role="meter" data-i18n-attr="aria-label:meterAria" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="meter-fill"></div></div><span id="meter-note" data-i18n="meterWaiting"></span></div>
-        </section>
-        <details id="advanced" class="advanced">
-          <summary><span data-i18n="advanced"></span><svg><use href="#chevron"/></svg></summary>
-          <div class="advanced-content">
-            <section class="mode-section" aria-labelledby="mode-label">
-              <div class="section-heading"><h2 id="mode-label" data-i18n="modeLabel"></h2><span id="mode-tag"></span></div>
-              <div class="modes" role="radiogroup" aria-labelledby="mode-label">
-                <label class="mode"><input type="radio" name="mode" value="normal" checked><span><svg><use href="#wave"/></svg><span data-i18n="modeNormal"></span></span></label>
-                <label class="mode"><input type="radio" name="mode" value="steady"><span><svg><use href="#sliders"/></svg><span data-i18n="modeSteady"></span></span></label>
-                <label class="mode"><input type="radio" name="mode" value="speech"><span><svg><use href="#voice"/></svg><span data-i18n="modeSpeech"></span></span></label>
-                <label class="mode"><input type="radio" name="mode" value="night"><span><svg><use href="#moon"/></svg><span data-i18n="modeNight"></span></span></label>
-                <label class="mode"><input type="radio" name="mode" value="music"><span><svg><use href="#music"/></svg><span data-i18n="modeMusic"></span></span></label>
-                <label class="mode"><input type="radio" name="mode" value="voice"><span><svg><use href="#spark"/></svg><span data-i18n="modeVoice"></span></span></label>
-              </div>
-              <p id="mode-description" class="hint"></p>
-            </section>
-            <section id="target-panel" class="target-section" data-i18n-attr="aria-label:targetLabel">
-              <div class="target-label"><label for="target" data-i18n="targetLabel"></label><output id="target-value" for="target">62 / 100</output></div>
-              <input id="target" class="range small-range" type="range" min="-48" max="-6" step="1" value="-22" aria-describedby="target-hint">
-              <div class="target-captions"><span data-i18n="targetCalmer"></span><span data-i18n="targetLouder"></span></div>
-              <p id="target-hint" class="hint" data-i18n="targetHint"></p>
-            </section>
-            <section class="preferences" data-i18n-attr="aria-label:preferencesAria">
-              <label class="remember-row"><input id="remember" type="checkbox" checked><span data-i18n="rememberSite"></span></label>
-              <div class="theme-row"><label for="theme" data-i18n="themeLabel"></label><select id="theme"><option value="dark" data-i18n="themeDark"></option><option value="light" data-i18n="themeLight"></option><option value="system" data-i18n="themeSystem"></option></select></div>
-              <div class="theme-row"><label for="language" data-i18n="languageLabel"></label><select id="language"><option value="en">English</option><option value="tr">Türkçe</option></select></div>
-              <button id="shortcuts" type="button" class="settings-button"><span data-i18n="shortcuts"></span> <span>↗</span></button>
-              <button id="reset" type="button" class="settings-button"><span data-i18n="resetAudio"></span><svg><use href="#icon-reset"/></svg></button>
-            </section>
-          </div>
-        </details>
-      </div>
+      <div id="feedback" class="notice feedback" role="status" hidden><span id="feedback-text"></span><button id="undo" class="link" type="button" data-i18n="undo" hidden></button></div>
     </div>
-    <footer><span class="local-label"><i></i><span data-i18n="localLabel"></span></span><button id="help" class="text-button" type="button" data-i18n="help"></button></footer>
+    <section id="main-view" class="view">
+      <header class="bar">
+        <h1>Tonvela</h1>
+        <span id="site" data-i18n="loadingTab"></span>
+        <button id="open-settings" class="icon-button" type="button" data-i18n-attr="aria-label:settings title:settings"><svg><use href="#gear"/></svg></button>
+      </header>
+      <div class="hero">
+        <div class="volume-value"><output id="volume-value">100</output><span>%</span></div>
+        <p id="status-text" role="status"></p>
+      </div>
+      <div id="volume" class="volume" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="400" aria-valuenow="100" data-i18n-attr="aria-label:volumeLabel">
+        <div id="volume-fill" class="volume-fill"></div>
+        <svg class="volume-icon" aria-hidden="true"><use id="volume-icon" href="#speaker"/></svg>
+      </div>
+      <div id="presets" class="segmented"></div>
+      <div class="group">
+        <button id="open-modes" class="row link-row" type="button">
+          <span class="row-label"><svg class="accent-icon"><use id="mode-icon" href="#wave"/></svg><span data-i18n="modeLabel"></span></span>
+          <span class="row-value"><span id="mode-name"></span><svg class="flip"><use href="#chevron"/></svg></span>
+        </button>
+      </div>
+      <div class="footer"><button id="original" class="link" type="button" data-i18n="originalSound"></button></div>
+    </section>
+
+    <section id="modes-view" class="view" hidden>
+      <header class="bar nav">
+        <button class="back link" type="button" data-back><svg class="flip"><use href="#back"/></svg><span data-i18n="back"></span></button>
+        <h2 data-i18n="modeLabel"></h2>
+      </header>
+      <div id="modes" class="group" role="radiogroup" data-i18n-attr="aria-label:modeLabel"></div>
+      <section id="target-panel" class="target" data-i18n-attr="aria-label:targetLabel">
+        <div class="target-head"><label for="target" data-i18n="targetLabel"></label><button id="learn" class="link" type="button" data-i18n-attr="title:learnTitle"><span data-i18n="learnButton"></span></button></div>
+        <input id="target" class="range" type="range" min="-48" max="-6" step="1" value="-22">
+        <div class="captions"><span data-i18n="targetCalmer"></span><span id="target-value" dir="ltr"></span><span data-i18n="targetLouder"></span></div>
+      </section>
+    </section>
+
+    <section id="settings-view" class="view" hidden>
+      <header class="bar nav">
+        <button class="back link" type="button" data-back><svg class="flip"><use href="#back"/></svg><span data-i18n="back"></span></button>
+        <h2 data-i18n="settings"></h2>
+      </header>
+      <h3 data-i18n="outputGroup"></h3>
+      <div class="group">
+        <div class="row"><label for="output-device" data-i18n="outputDevice"></label><select id="output-device"><option value="" data-i18n="defaultDevice"></option></select></div>
+        <label class="row"><span data-i18n="monoLabel"></span><span class="toggle"><input id="mono" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
+        <div class="row stacked">
+          <div class="row-head"><label for="balance" data-i18n="balanceLabel"></label><button id="balance-center" class="link" type="button" data-i18n="center"></button></div>
+          <div class="balance" dir="ltr"><span data-i18n="balanceLeft"></span><input id="balance" class="range" type="range" min="-100" max="100" step="5" value="0"><span data-i18n="balanceRight"></span></div>
+        </div>
+        <div class="row stacked">
+          <span id="protection-label" data-i18n="protectionLabel"></span>
+          <div id="protection" class="segmented inset" role="radiogroup" aria-labelledby="protection-label"></div>
+        </div>
+      </div>
+      <p class="hint"><span data-i18n="outputHint"></span> <button id="device-names" class="link" type="button" data-i18n="showDeviceNames" hidden></button></p>
+      <h3 data-i18n="generalGroup"></h3>
+      <div class="group">
+        <label class="row"><span data-i18n="rememberSites"></span><span class="toggle"><input id="remember" type="checkbox" role="switch"><span aria-hidden="true"></span></span></label>
+        <div class="row"><label for="theme" data-i18n="themeLabel"></label><select id="theme"><option value="system" data-i18n="themeSystem"></option><option value="light" data-i18n="themeLight"></option><option value="dark" data-i18n="themeDark"></option></select></div>
+        <div class="row"><label for="language" data-i18n="languageLabel"></label><select id="language"></select></div>
+      </div>
+      <div class="group">
+        <button id="shortcuts" class="row link-row" type="button"><span data-i18n="shortcuts"></span><svg class="muted-icon"><use href="#external"/></svg></button>
+        <button id="help" class="row link-row" type="button"><span data-i18n="help"></span><svg class="muted-icon"><use href="#external"/></svg></button>
+      </div>
+      <p class="hint" data-i18n="localNote"></p>
+    </section>
   </main>
   <script src="popup.js" type="module"></script>
 </body>

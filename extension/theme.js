@@ -1,6 +1,6 @@
 const systemTheme = matchMedia("(prefers-color-scheme: dark)");
-const normalizeTheme = value => ["dark", "light", "system"].includes(value) ? value : "dark";
-let preference = "dark";
+const normalizeTheme = value => ["dark", "light", "system"].includes(value) ? value : "system";
+let preference = "system";
 
 function applyTheme(value) {
   preference = normalizeTheme(value);
@@ -25,5 +25,5 @@ try {
   const { theme } = await chrome.storage.local.get("theme");
   applyTheme(theme);
 } catch {
-  applyTheme("dark");
+  applyTheme("system");
 }
